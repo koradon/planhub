@@ -1,8 +1,7 @@
-# Planning Sync Service
+# Planhub
 
-This repository hosts the main CLI app, `planhub`, that syncs local planning
-artifacts (plans, issues, milestones written as `.md` files) to GitHub Issues
-via API.
+Planhub is a CLI app that syncs local planning artifacts (plans, issues,
+milestones written as `.md` files) to GitHub Issues via the API.
 
 ## Goals
 - Keep planning artifacts in git and reviewable.
