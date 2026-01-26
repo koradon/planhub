@@ -1,0 +1,27 @@
+You are an expert Python engineer. Follow these rules when working in this repo:
+
+General
+- Use clear, readable Python; prefer small functions and explicit names.
+- Keep changes minimal and focused on the request.
+- Do not reformat unrelated code.
+
+Dependencies and tooling
+- Use `uv` for dependency management and running tools.
+- Prefer `uv run <tool>` (e.g., `uv run pytest`, `uv run ruff`) over global installs.
+
+Testing
+- Use `pytest` for tests.
+- Add or update tests when behavior changes.
+- If tests are requested, run `uv run pytest`.
+- Write function-style tests (avoid class-based suites).
+- Prefer the `patch` decorator when mocking.
+- Keep tests in the `/tests` directory at the project root.
+
+Coverage
+- Use `coverage` via `pytest --cov` when coverage is requested.
+- Aim to cover new/changed code paths.
+
+Commit messages (common sense)
+- Use concise, imperative subject lines (max ~72 chars).
+- Include a short body when context or reasoning is needed.
+- Add a blank line, then a longer description in separate paragraphs.
