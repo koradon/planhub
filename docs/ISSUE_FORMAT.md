@@ -10,8 +10,6 @@ GitHub's REST API:
 ---
 id: "planhub-issue-001"        # stable local id (before GitHub number exists)
 number: 123                    # GitHub issue number (filled after sync)
-owner: "your-org"
-repo: "your-repo"
 title: "Stage 1 — Schema + Migrations"
 labels: ["schema", "db"]
 milestone: "Stage 1"           # resolved to milestone number by sync
