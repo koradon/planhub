@@ -36,7 +36,9 @@ def test_load_issue_document_parses_fields(tmp_path) -> None:
 
     assert issue.title == "Ship it"
     assert issue.labels == ("p1", "backend")
+    assert issue.labels_set is True
     assert issue.assignees == ("alice",)
+    assert issue.assignees_set is True
     assert issue.state == IssueState.CLOSED
     assert issue.state_reason == IssueStateReason.NOT_PLANNED
     assert issue.number == 12
@@ -92,3 +94,26 @@ def test_update_front_matter_preserves_body(tmp_path) -> None:
     issue = load_issue_document(issue_path)
     assert issue.number == 42
     assert "Body text." in issue.body
+
+
+def test_load_issue_document_parses_numeric_milestone(tmp_path) -> None:
+    issue_path = tmp_path / "issue.md"
+    issue_path.write_text(
+        "\n".join(
+            [
+                "---",
+                'title: "Ship it"',
+                "milestone: 7",
+                "---",
+                "",
+                "Body text.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    issue = load_issue_document(issue_path)
+
+    assert issue.milestone_number == 7
+    assert issue.milestone_set is True
+    assert issue.milestone is None

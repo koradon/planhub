@@ -69,3 +69,79 @@ def test_sync_updates_existing_issue(
 
     assert result.exit_code == 0
     client_instance.update_issue.assert_called_once()
+
+
+@patch("planhub.cli.commands.sync.get_github_repo_from_git")
+@patch("planhub.cli.commands.sync.get_auth_token")
+@patch("planhub.cli.commands.sync.GitHubClient")
+def test_sync_clears_labels_assignees_and_milestone(
+    mock_client, mock_token, mock_repo, tmp_path, monkeypatch
+) -> None:
+    mock_token.return_value = "token"
+    mock_repo.return_value = ("acme", "roadmap")
+    client_instance = mock_client.return_value
+
+    layout = ensure_layout(tmp_path)
+    issue_path = layout.issues_dir / "issue.md"
+    issue_path.write_text(
+        "\n".join(
+            [
+                "---",
+                'title: "Ship it"',
+                "number: 99",
+                "labels: []",
+                "assignees: []",
+                "milestone: null",
+                "---",
+                "",
+                "Body",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.chdir(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(app, ["sync"])
+
+    assert result.exit_code == 0
+    kwargs = client_instance.update_issue.call_args.kwargs
+    assert kwargs["labels"] == []
+    assert kwargs["assignees"] == []
+    assert kwargs["clear_milestone"] is True
+
+
+@patch("planhub.cli.commands.sync.get_github_repo_from_git")
+@patch("planhub.cli.commands.sync.get_auth_token")
+@patch("planhub.cli.commands.sync.GitHubClient")
+def test_sync_uses_numeric_milestone(
+    mock_client, mock_token, mock_repo, tmp_path, monkeypatch
+) -> None:
+    mock_token.return_value = "token"
+    mock_repo.return_value = ("acme", "roadmap")
+    client_instance = mock_client.return_value
+
+    layout = ensure_layout(tmp_path)
+    issue_path = layout.issues_dir / "issue.md"
+    issue_path.write_text(
+        "\n".join(
+            [
+                "---",
+                'title: "Ship it"',
+                "number: 99",
+                "milestone: 7",
+                "---",
+                "",
+                "Body",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.chdir(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(app, ["sync"])
+
+    assert result.exit_code == 0
+    kwargs = client_instance.update_issue.call_args.kwargs
+    assert kwargs["milestone"] == 7

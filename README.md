@@ -80,6 +80,11 @@ export GITHUB_TOKEN=ghp_your_token_here
         diagram.png
 ```
 
+## Front Matter Tips
+- `milestone` can be a title or a number; use `milestone: null` to clear it.
+- Use `labels: []` or `assignees: []` to remove them on GitHub.
+- `state_reason` requires `state: "closed"`.
+
 ## Next Steps
 - Implement the parsing + GitHub sync logic.
 - Add CI to validate file formats.

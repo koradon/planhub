@@ -10,7 +10,7 @@ from planhub.documents import (
     load_milestone_document,
     update_front_matter,
 )
-from planhub.github import GitHubClient
+from planhub.github import GitHubClient, IssueState
 from planhub.layout import PlanLayout, discover_milestones, discover_root_issues
 
 
@@ -77,6 +77,8 @@ def _collect_issues_for_entry(entry, plan: SyncPlan, errors: list[str]) -> int:
         except DocumentError as exc:
             errors.append(str(exc))
             continue
+        if _validate_issue_state(issue_doc, issue_file, errors):
+            continue
         if issue_doc.number is None:
             plan.issues_to_create.append(
                 (
@@ -105,12 +107,23 @@ def _collect_root_issues(layout: PlanLayout, plan: SyncPlan, errors: list[str]) 
         except DocumentError as exc:
             errors.append(str(exc))
             continue
+        if _validate_issue_state(issue_doc, issue_file, errors):
+            continue
         if issue_doc.number is None:
             plan.issues_to_create.append((issue_file, issue_doc, None))
         else:
             plan.issues_to_update.append((issue_file, issue_doc, None))
         parsed += 1
     return parsed
+
+
+def _validate_issue_state(
+    issue_doc: IssueDocument, issue_path: Path, errors: list[str]
+) -> bool:
+    if issue_doc.state_reason and issue_doc.state != IssueState.CLOSED:
+        errors.append(f"{issue_path}: state_reason requires state='closed'.")
+        return True
+    return False
 
 
 def _create_missing_milestones(
@@ -165,14 +178,18 @@ def _resolve_milestone_number(
     issue_doc: IssueDocument,
     milestone_title: str | None,
     errors: list[str],
-) -> int | None:
+) -> tuple[int | None, bool]:
+    if issue_doc.milestone_number is not None:
+        return issue_doc.milestone_number, False
+    if issue_doc.milestone_set and issue_doc.milestone is None:
+        return None, True
     milestone_number = None
     effective_title = issue_doc.milestone or milestone_title
     if effective_title:
         milestone_number = plan.milestone_numbers.get(effective_title)
         if milestone_number is None:
             errors.append(f"{issue_path}: milestone '{effective_title}' has no number.")
-    return milestone_number
+    return milestone_number, False
 
 
 def _create_missing_issues(
@@ -183,18 +200,22 @@ def _create_missing_issues(
     errors: list[str],
 ) -> None:
     for issue_path, issue_doc, milestone_title in plan.issues_to_create:
-        milestone_number = _resolve_milestone_number(
+        milestone_number, clear_milestone = _resolve_milestone_number(
             plan, issue_path, issue_doc, milestone_title, errors
         )
+        if clear_milestone:
+            milestone_number = None
         if (issue_doc.milestone or milestone_title) and milestone_number is None:
             continue
+        labels = list(issue_doc.labels) if issue_doc.labels_set else None
+        assignees = list(issue_doc.assignees) if issue_doc.assignees_set else None
         created = client.create_issue(
             owner,
             repo,
             issue_doc.title,
             body=issue_doc.body or None,
-            labels=list(issue_doc.labels) if issue_doc.labels else None,
-            assignees=list(issue_doc.assignees) if issue_doc.assignees else None,
+            labels=labels,
+            assignees=assignees,
             milestone=milestone_number,
             issue_type=issue_doc.issue_type,
         )
@@ -225,20 +246,23 @@ def _update_existing_issues(
         if issue_doc.number is None:
             errors.append(f"{issue_path}: missing issue number.")
             continue
-        milestone_number = _resolve_milestone_number(
+        milestone_number, clear_milestone = _resolve_milestone_number(
             plan, issue_path, issue_doc, milestone_title, errors
         )
         if (issue_doc.milestone or milestone_title) and milestone_number is None:
             continue
+        labels = list(issue_doc.labels) if issue_doc.labels_set else None
+        assignees = list(issue_doc.assignees) if issue_doc.assignees_set else None
         client.update_issue(
             owner,
             repo,
             issue_doc.number,
             title=issue_doc.title,
             body=issue_doc.body or None,
-            labels=list(issue_doc.labels) if issue_doc.labels else None,
-            assignees=list(issue_doc.assignees) if issue_doc.assignees else None,
+            labels=labels,
+            assignees=assignees,
             milestone=milestone_number,
+            clear_milestone=clear_milestone,
             issue_type=issue_doc.issue_type,
             state=issue_doc.state,
             state_reason=issue_doc.state_reason,

@@ -13,7 +13,7 @@ id: "planhub-issue-001"        # stable local id (before GitHub number exists)
 number: 123                    # GitHub issue number (filled after sync)
 title: "Stage 1 — Schema + Migrations"
 labels: ["schema", "db"]
-milestone: "Stage 1"           # resolved to milestone number by sync
+milestone: "Stage 1"           # or a milestone number (e.g. 12)
 assignees: ["your-username"]   # array only; "assignee" is deprecated by GitHub
 type: "Task"                   # optional GitHub issue type name
 state: "open"                  # open | closed
@@ -31,3 +31,6 @@ for subtasks when needed.
 - `number` is the canonical identity after creation; it should be recorded
   once available to keep sync stable.
 - `state` and `state_reason` are set via the update issue endpoint.
+- Use `labels: []` or `assignees: []` to clear them on GitHub.
+- Use `milestone: null` to remove a milestone.
+- `state_reason` requires `state: "closed"`.

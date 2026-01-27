@@ -108,8 +108,12 @@ def _issue_document_from_api(
         issue_id=None,
         number=issue.get("number"),
         labels=labels,
+        labels_set=True,
         milestone=milestone_title,
+        milestone_number=None,
+        milestone_set=milestone_title is not None,
         assignees=assignees,
+        assignees_set=True,
         issue_type=None,
         state=None if not state else _parse_state(state),
         state_reason=None if not state_reason else _parse_state_reason(state_reason),
@@ -137,8 +141,10 @@ def _write_issue(issue: IssueDocument) -> None:
         front_matter["labels"] = list(issue.labels)
     if issue.assignees:
         front_matter["assignees"] = list(issue.assignees)
-    if issue.milestone:
+    if issue.milestone is not None:
         front_matter["milestone"] = issue.milestone
+    if issue.milestone_number is not None:
+        front_matter["milestone"] = issue.milestone_number
     if issue.state:
         front_matter["state"] = issue.state.value
     if issue.state_reason:

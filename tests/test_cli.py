@@ -86,6 +86,22 @@ def test_sync_dry_run_reports_counts(tmp_path, monkeypatch, capsys) -> None:
     assert "Found 1 milestones and 1 issues." in result.output
 
 
+def test_sync_rejects_state_reason_without_closed_state(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".plan" / "milestones").mkdir(parents=True, exist_ok=True)
+    _create_root_issue(
+        tmp_path / ".plan" / "issues" / "issue-root.md", number=10, state_reason=True
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["sync"])
+
+    assert result.exit_code == 1
+    assert "state_reason requires state='closed'" in result.output
+
+
 def _create_milestone(
     directory: Path,
     milestone_title: str,
@@ -112,11 +128,15 @@ def _create_milestone(
             )
 
 
-def _create_root_issue(path: Path, number: int | None = None) -> None:
+def _create_root_issue(
+    path: Path, number: int | None = None, state_reason: bool = False
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     lines = ["---", 'title: "Root Issue"']
     if number is not None:
         lines.append(f"number: {number}")
+    if state_reason:
+        lines.append('state_reason: "completed"')
     lines.append("---")
     lines.append("")
     lines.append("# Issue")

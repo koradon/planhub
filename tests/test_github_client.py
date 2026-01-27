@@ -13,9 +13,9 @@ from unittest.mock import patch
 
 
 class DummyResponse:
-    def __init__(self, payload: dict) -> None:
+    def __init__(self, payload: dict, headers: dict | None = None) -> None:
         self._payload = payload
-        self.headers = {}
+        self.headers = headers or {}
 
     def read(self) -> bytes:
         return json.dumps(self._payload).encode("utf-8")
@@ -122,3 +122,64 @@ def test_reopen_issue_clears_state_reason(mock_urlopen) -> None:
     assert payload["state"] == "open"
     request = mock_urlopen.call_args[0][0]
     assert json.loads(request.data.decode("utf-8")) == {"state": "open"}
+
+
+@patch("planhub.github.urlopen")
+def test_update_issue_includes_state_reason_when_closed(mock_urlopen) -> None:
+    mock_urlopen.return_value = DummyResponse({"id": 1})
+    client = GitHubClient(token="token-123")
+
+    client.update_issue(
+        "acme",
+        "roadmap",
+        42,
+        state=IssueState.CLOSED,
+        state_reason=IssueStateReason.COMPLETED,
+    )
+
+    request = mock_urlopen.call_args[0][0]
+    assert json.loads(request.data.decode("utf-8")) == {
+        "state": "closed",
+        "state_reason": "completed",
+    }
+
+
+@patch("planhub.github.urlopen")
+def test_list_issues_paginates(mock_urlopen) -> None:
+    mock_urlopen.side_effect = [
+        DummyResponse([{"id": 1}], headers={"Link": '<x>; rel="next"'}),
+        DummyResponse([{"id": 2}], headers={}),
+    ]
+    client = GitHubClient(token="token-123")
+
+    issues = client.list_issues("acme", "roadmap", state="all")
+
+    assert [issue["id"] for issue in issues] == [1, 2]
+
+
+@patch("planhub.github.urlopen")
+def test_update_issue_clears_milestone_and_guards_state_reason(
+    mock_urlopen,
+) -> None:
+    mock_urlopen.return_value = DummyResponse({"id": 1})
+    client = GitHubClient(token="token-123")
+
+    client.update_issue(
+        "acme",
+        "roadmap",
+        42,
+        title="Ship it",
+        labels=[],
+        assignees=[],
+        clear_milestone=True,
+        state=None,
+        state_reason=IssueStateReason.COMPLETED,
+    )
+
+    request = mock_urlopen.call_args[0][0]
+    assert json.loads(request.data.decode("utf-8")) == {
+        "title": "Ship it",
+        "labels": [],
+        "assignees": [],
+        "milestone": None,
+    }

@@ -23,8 +23,12 @@ class IssueDocument:
     issue_id: Optional[str]
     number: Optional[int]
     labels: tuple[str, ...]
+    labels_set: bool
     milestone: Optional[str]
+    milestone_number: Optional[int]
+    milestone_set: bool
     assignees: tuple[str, ...]
+    assignees_set: bool
     issue_type: Optional[str]
     state: Optional[IssueState]
     state_reason: Optional[IssueStateReason]
@@ -48,8 +52,10 @@ def load_issue_document(path: Path) -> IssueDocument:
     issue_id = _optional_str(metadata, "id", path)
     number = _optional_int(metadata, "number", path)
     labels = _optional_str_list(metadata, "labels", path)
-    milestone = _optional_str(metadata, "milestone", path)
+    labels_set = _has_key(metadata, "labels")
+    milestone, milestone_number, milestone_set = _optional_milestone(metadata, path)
     assignees = _optional_str_list(metadata, "assignees", path)
+    assignees_set = _has_key(metadata, "assignees")
     issue_type = _optional_str(metadata, "type", path)
     state = _parse_issue_state(metadata.get("state"), path)
     state_reason = _parse_state_reason(metadata.get("state_reason"), path)
@@ -60,8 +66,12 @@ def load_issue_document(path: Path) -> IssueDocument:
         issue_id=issue_id,
         number=number,
         labels=labels,
+        labels_set=labels_set,
         milestone=milestone,
+        milestone_number=milestone_number,
+        milestone_set=milestone_set,
         assignees=assignees,
+        assignees_set=assignees_set,
         issue_type=issue_type,
         state=state,
         state_reason=state_reason,
@@ -162,6 +172,25 @@ def _optional_str_list(
     if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
         raise DocumentError(path, f"Expected '{key}' to be a list of strings.")
     return tuple(value)
+
+
+def _optional_milestone(
+    metadata: Mapping[str, Any], path: Path
+) -> tuple[Optional[str], Optional[int], bool]:
+    if "milestone" not in metadata:
+        return None, None, False
+    value = metadata.get("milestone")
+    if value is None:
+        return None, None, True
+    if isinstance(value, int):
+        return None, value, True
+    if isinstance(value, str):
+        return value, None, True
+    raise DocumentError(path, "Expected 'milestone' to be a string, int, or null.")
+
+
+def _has_key(metadata: Mapping[str, Any], key: str) -> bool:
+    return key in metadata
 
 
 def _parse_issue_state(value: Any, path: Path) -> Optional[IssueState]:

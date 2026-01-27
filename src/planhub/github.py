@@ -85,6 +85,7 @@ class GitHubClient:
         labels: Optional[list[str]] = None,
         assignees: Optional[list[str]] = None,
         milestone: Optional[int] = None,
+        clear_milestone: bool = False,
         issue_type: Optional[str] = None,
         state: Optional["IssueState"] = None,
         state_reason: Optional["IssueStateReason"] = None,
@@ -98,13 +99,13 @@ class GitHubClient:
             payload["labels"] = labels
         if assignees is not None:
             payload["assignees"] = assignees
-        if milestone is not None:
+        if milestone is not None or clear_milestone:
             payload["milestone"] = milestone
         if issue_type is not None:
             payload["type"] = issue_type
         if state is not None:
             payload["state"] = state.value
-        if state_reason is not None:
+        if state_reason is not None and state == IssueState.CLOSED:
             payload["state_reason"] = state_reason.value
         return self._request("PATCH", f"/repos/{owner}/{repo}/issues/{number}", payload)
 
