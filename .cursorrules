@@ -4,6 +4,7 @@ General
 - Use clear, readable Python; prefer small functions and explicit names.
 - Keep changes minimal and focused on the request.
 - Do not reformat unrelated code.
+- Try to design in Domain Driven Development way.
 
 Dependencies and tooling
 - Use `uv` for dependency management and running tools.
