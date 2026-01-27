@@ -25,6 +25,7 @@ classifiers = [
 ]
 dependencies = [
     "build>=1.4.0",
+    "pyyaml>=6.0",
     "twine>=6.2.0",
 ]
 

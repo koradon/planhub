@@ -31,8 +31,12 @@ uv pip install planhub
 ## Commands
 - `planhub init`
   - Creates the standard `.plan/` structure in the current repo.
+  - Use `--dry-run` to preview what would be created.
 - `planhub sync`
   - Reads the `.md` files and creates/updates GitHub issues/milestones.
+  - Use `--dry-run` to validate files without writing changes.
+  - Sync never deletes local files; if items cannot be identified, it skips
+    removal and reports errors.
 
 ## Suggested Data Repo Layout
 ```
