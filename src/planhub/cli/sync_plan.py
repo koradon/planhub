@@ -1,12 +1,7 @@
 from __future__ import annotations
 
-import argparse
 from pathlib import Path
-from typing import Sequence
 
-from planhub.auth import get_auth_token
-from planhub.github import GitHubClient
-from planhub.importer import import_existing_issues
 from planhub.documents import (
     DocumentError,
     IssueDocument,
@@ -15,17 +10,11 @@ from planhub.documents import (
     load_milestone_document,
     update_front_matter,
 )
-from planhub.layout import (
-    PlanLayout,
-    discover_milestones,
-    discover_root_issues,
-    ensure_layout,
-    load_layout,
-)
-from planhub.repository import get_github_repo_from_git
+from planhub.github import GitHubClient
+from planhub.layout import PlanLayout, discover_milestones, discover_root_issues
 
 
-class _SyncPlan:
+class SyncPlan:
     def __init__(self) -> None:
         self.milestones_to_create: list[tuple[Path, MilestoneDocument]] = []
         self.milestones_to_update: list[tuple[Path, MilestoneDocument]] = []
@@ -35,150 +24,10 @@ class _SyncPlan:
         self.milestone_titles_by_dir: dict[Path, str] = {}
 
 
-def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="planhub")
-    subparsers = parser.add_subparsers(dest="command")
-
-    init_parser = subparsers.add_parser(
-        "init", help="Initialize the .plan layout in a repo."
-    )
-    init_parser.add_argument(
-        "--dry-run", action="store_true", help="Show what would change without writing."
-    )
-
-    sync_parser = subparsers.add_parser("sync", help="Sync .plan files with GitHub.")
-    sync_parser.add_argument(
-        "--dry-run", action="store_true", help="Show what would change without writing."
-    )
-    sync_parser.add_argument(
-        "--import-existing",
-        action="store_true",
-        help="Import existing GitHub issues into .plan files.",
-    )
-
-    args = parser.parse_args(argv)
-    if args.command == "init":
-        return _run_init(Path.cwd(), dry_run=args.dry_run)
-    if args.command == "sync":
-        return _run_sync(
-            Path.cwd(),
-            dry_run=args.dry_run,
-            import_existing=args.import_existing,
-        )
-
-    parser.print_help()
-    return 1
-
-
-def _run_init(repo_root: Path, dry_run: bool) -> int:
-    if dry_run:
-        plan_root = repo_root / ".plan"
-        milestones_dir = plan_root / "milestones"
-        issues_dir = plan_root / "issues"
-        print("Dry run: would create plan layout:")
-        print(f"- {plan_root}")
-        print(f"- {milestones_dir}")
-        print(f"- {issues_dir}")
-        return 0
-
-    layout = ensure_layout(repo_root)
-    print(f"Initialized plan layout at {layout.root}")
-    return 0
-
-
-def _run_sync(repo_root: Path, dry_run: bool, import_existing: bool) -> int:
-    try:
-        layout = load_layout(repo_root)
-    except FileNotFoundError as exc:
-        print(f"{exc}. Run 'planhub init' first.")
-        return 1
-
-    client: GitHubClient | None = None
-    owner_repo = _import_existing_issues_if_requested(
-        layout,
-        repo_root,
-        dry_run=dry_run,
-        import_existing=import_existing,
-    )
-    if import_existing and owner_repo is None:
-        return 1
-    if owner_repo is not None:
-        client, owner_repo = owner_repo
-
-    plan, parsed_milestones, parsed_issues, errors = _build_sync_plan(layout)
-    if _report_parse_errors(errors):
-        return 1
-
-    if dry_run:
-        print("Dry run: no changes will be written.")
-        print(
-            "Dry run: would create"
-            f" {len(plan.milestones_to_create)} milestones and"
-            f" {len(plan.issues_to_create)} issues."
-        )
-        print(
-            "Dry run: would update"
-            f" {len(plan.milestones_to_update)} milestones and"
-            f" {len(plan.issues_to_update)} issues."
-        )
-        print(f"Found {parsed_milestones} milestones and {parsed_issues} issues.")
-        return 0
-
-    if (
-        plan.milestones_to_create
-        or plan.issues_to_create
-        or plan.milestones_to_update
-        or plan.issues_to_update
-    ):
-        if client is None:
-            auth = _get_github_client(repo_root)
-            if auth is None:
-                return 1
-            client, owner, repo = auth
-            owner_repo = (owner, repo)
-        _apply_sync_plan(client, owner_repo, plan, errors)
-
-    if errors:
-        for error in errors:
-            print(f"Error: {error}")
-        return 1
-    print(f"Found {parsed_milestones} milestones and {parsed_issues} issues.")
-    return 0
-
-
-def _import_existing_issues_if_requested(
+def build_sync_plan(
     layout: PlanLayout,
-    repo_root: Path,
-    *,
-    dry_run: bool,
-    import_existing: bool,
-) -> tuple[GitHubClient, tuple[str, str]] | None:
-    if not import_existing:
-        return None
-    auth = _get_github_client(repo_root)
-    if auth is None:
-        return None
-    client, owner, repo = auth
-    result = import_existing_issues(
-        layout,
-        owner,
-        repo,
-        client=client,
-        dry_run=dry_run,
-    )
-    print(
-        "Imported issues:"
-        f" {result.issues_created} created,"
-        f" {result.issues_skipped} skipped,"
-        f" {result.milestones_created} milestones created."
-    )
-    return client, (owner, repo)
-
-
-def _build_sync_plan(
-    layout: PlanLayout,
-) -> tuple[_SyncPlan, int, int, list[str]]:
-    plan = _SyncPlan()
+) -> tuple[SyncPlan, int, int, list[str]]:
+    plan = SyncPlan()
     errors: list[str] = []
     parsed_milestones = 0
     parsed_issues = 0
@@ -204,7 +53,23 @@ def _build_sync_plan(
     return plan, parsed_milestones, parsed_issues, errors
 
 
-def _collect_issues_for_entry(entry, plan: _SyncPlan, errors: list[str]) -> int:
+def apply_sync_plan(
+    client: GitHubClient,
+    owner_repo: tuple[str, str] | None,
+    plan: SyncPlan,
+    errors: list[str],
+) -> None:
+    if owner_repo is None:
+        errors.append("Missing repository information for sync.")
+        return
+    owner, repo = owner_repo
+    _create_missing_milestones(client, owner, repo, plan, errors)
+    _update_existing_milestones(client, owner, repo, plan, errors)
+    _create_missing_issues(client, owner, repo, plan, errors)
+    _update_existing_issues(client, owner, repo, plan, errors)
+
+
+def _collect_issues_for_entry(entry, plan: SyncPlan, errors: list[str]) -> int:
     parsed = 0
     for issue_file in entry.issue_files:
         try:
@@ -232,9 +97,7 @@ def _collect_issues_for_entry(entry, plan: _SyncPlan, errors: list[str]) -> int:
     return parsed
 
 
-def _collect_root_issues(
-    layout: PlanLayout, plan: _SyncPlan, errors: list[str]
-) -> int:
+def _collect_root_issues(layout: PlanLayout, plan: SyncPlan, errors: list[str]) -> int:
     parsed = 0
     for issue_file in discover_root_issues(layout):
         try:
@@ -250,35 +113,11 @@ def _collect_root_issues(
     return parsed
 
 
-def _report_parse_errors(errors: list[str]) -> bool:
-    if not errors:
-        return False
-    for error in errors:
-        print(f"Error: {error}")
-    return True
-
-
-def _apply_sync_plan(
-    client: GitHubClient,
-    owner_repo: tuple[str, str] | None,
-    plan: _SyncPlan,
-    errors: list[str],
-) -> None:
-    if owner_repo is None:
-        errors.append("Missing repository information for sync.")
-        return
-    owner, repo = owner_repo
-    _create_missing_milestones(client, owner, repo, plan, errors)
-    _update_existing_milestones(client, owner, repo, plan, errors)
-    _create_missing_issues(client, owner, repo, plan, errors)
-    _update_existing_issues(client, owner, repo, plan, errors)
-
-
 def _create_missing_milestones(
     client: GitHubClient,
     owner: str,
     repo: str,
-    plan: _SyncPlan,
+    plan: SyncPlan,
     errors: list[str],
 ) -> None:
     for milestone_path, milestone_doc in plan.milestones_to_create:
@@ -302,7 +141,7 @@ def _update_existing_milestones(
     client: GitHubClient,
     owner: str,
     repo: str,
-    plan: _SyncPlan,
+    plan: SyncPlan,
     errors: list[str],
 ) -> None:
     for milestone_path, milestone_doc in plan.milestones_to_update:
@@ -321,7 +160,7 @@ def _update_existing_milestones(
 
 
 def _resolve_milestone_number(
-    plan: _SyncPlan,
+    plan: SyncPlan,
     issue_path: Path,
     issue_doc: IssueDocument,
     milestone_title: str | None,
@@ -340,7 +179,7 @@ def _create_missing_issues(
     client: GitHubClient,
     owner: str,
     repo: str,
-    plan: _SyncPlan,
+    plan: SyncPlan,
     errors: list[str],
 ) -> None:
     for issue_path, issue_doc, milestone_title in plan.issues_to_create:
@@ -379,7 +218,7 @@ def _update_existing_issues(
     client: GitHubClient,
     owner: str,
     repo: str,
-    plan: _SyncPlan,
+    plan: SyncPlan,
     errors: list[str],
 ) -> None:
     for issue_path, issue_doc, milestone_title in plan.issues_to_update:
@@ -404,25 +243,3 @@ def _update_existing_issues(
             state=issue_doc.state,
             state_reason=issue_doc.state_reason,
         )
-
-
-def _get_github_client(
-    repo_root: Path,
-) -> tuple[GitHubClient, str, str] | None:
-    token = get_auth_token()
-    if not token:
-        print(
-            "Missing GitHub credentials. "
-            "Set GITHUB_TOKEN/GH_TOKEN or run 'gh auth login'."
-        )
-        return None
-    try:
-        owner, repo = get_github_repo_from_git(repo_root)
-    except ValueError as exc:
-        print(f"{exc} Cannot sync issues.")
-        return None
-    return GitHubClient(token), owner, repo
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

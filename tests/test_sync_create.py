@@ -1,13 +1,15 @@
 from unittest.mock import patch
 
-from planhub.cli import main
+from typer.testing import CliRunner
+
+from planhub.cli.app import app
 from planhub.documents import load_issue_document, load_milestone_document
 from planhub.layout import ensure_layout
 
 
-@patch("planhub.cli.get_github_repo_from_git")
-@patch("planhub.cli.get_auth_token")
-@patch("planhub.cli.GitHubClient")
+@patch("planhub.cli.commands.sync.get_github_repo_from_git")
+@patch("planhub.cli.commands.sync.get_auth_token")
+@patch("planhub.cli.commands.sync.GitHubClient")
 def test_sync_creates_missing_issue_and_milestone(
     mock_client, mock_token, mock_repo, tmp_path, monkeypatch
 ) -> None:
@@ -33,9 +35,10 @@ def test_sync_creates_missing_issue_and_milestone(
     )
 
     monkeypatch.chdir(tmp_path)
-    exit_code = main(["sync"])
+    runner = CliRunner()
+    result = runner.invoke(app, ["sync"])
 
-    assert exit_code == 0
+    assert result.exit_code == 0
     milestone = load_milestone_document(milestone_dir / "milestone.md")
     issue = load_issue_document(issue_path)
     assert milestone.number == 7
@@ -43,9 +46,9 @@ def test_sync_creates_missing_issue_and_milestone(
     client_instance.update_issue_state.assert_called_once()
 
 
-@patch("planhub.cli.get_github_repo_from_git")
-@patch("planhub.cli.get_auth_token")
-@patch("planhub.cli.GitHubClient")
+@patch("planhub.cli.commands.sync.get_github_repo_from_git")
+@patch("planhub.cli.commands.sync.get_auth_token")
+@patch("planhub.cli.commands.sync.GitHubClient")
 def test_sync_updates_existing_issue(
     mock_client, mock_token, mock_repo, tmp_path, monkeypatch
 ) -> None:
@@ -61,7 +64,8 @@ def test_sync_updates_existing_issue(
     )
 
     monkeypatch.chdir(tmp_path)
-    exit_code = main(["sync"])
+    runner = CliRunner()
+    result = runner.invoke(app, ["sync"])
 
-    assert exit_code == 0
+    assert result.exit_code == 0
     client_instance.update_issue.assert_called_once()

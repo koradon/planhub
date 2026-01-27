@@ -1,42 +1,54 @@
 from pathlib import Path
 
-from planhub.cli import main
+from typer.testing import CliRunner
+from unittest.mock import patch
+
+from planhub.cli.app import app
 
 
 def test_init_creates_layout(tmp_path, monkeypatch, capsys) -> None:
     monkeypatch.chdir(tmp_path)
 
-    exit_code = main(["init"])
+    runner = CliRunner()
+    result = runner.invoke(app, ["init"])
 
-    assert exit_code == 0
+    assert result.exit_code == 0
     assert (tmp_path / ".plan" / "milestones").is_dir()
     assert (tmp_path / ".plan" / "issues").is_dir()
-    captured = capsys.readouterr()
-    assert "Initialized plan layout" in captured.out
+    assert "Initialized plan layout" in result.output
 
 
 def test_init_dry_run_does_not_create_layout(tmp_path, monkeypatch, capsys) -> None:
     monkeypatch.chdir(tmp_path)
 
-    exit_code = main(["init", "--dry-run"])
+    runner = CliRunner()
+    result = runner.invoke(app, ["init", "--dry-run"])
 
-    assert exit_code == 0
+    assert result.exit_code == 0
     assert not (tmp_path / ".plan").exists()
-    captured = capsys.readouterr()
-    assert "Dry run" in captured.out
+    assert "Dry run" in result.output
 
 
 def test_sync_requires_layout(tmp_path, monkeypatch, capsys) -> None:
     monkeypatch.chdir(tmp_path)
 
-    exit_code = main(["sync"])
+    runner = CliRunner()
+    result = runner.invoke(app, ["sync"])
 
-    assert exit_code == 1
-    captured = capsys.readouterr()
-    assert "Run 'planhub init' first." in captured.out
+    assert result.exit_code == 1
+    assert "Run 'planhub init' first." in result.output
 
 
-def test_sync_reports_counts(tmp_path, monkeypatch, capsys) -> None:
+@patch("planhub.cli.commands.sync.get_github_repo_from_git")
+@patch("planhub.cli.commands.sync.get_auth_token")
+@patch("planhub.cli.commands.sync.GitHubClient")
+def test_sync_reports_counts(
+    mock_client, mock_token, mock_repo, tmp_path, monkeypatch, capsys
+) -> None:
+    mock_token.return_value = "token"
+    mock_repo.return_value = ("acme", "roadmap")
+    mock_client.return_value.update_issue.return_value = {}
+    mock_client.return_value.update_milestone.return_value = {}
     monkeypatch.chdir(tmp_path)
     _create_milestone(
         tmp_path / ".plan" / "milestones" / "stage-1",
@@ -51,11 +63,11 @@ def test_sync_reports_counts(tmp_path, monkeypatch, capsys) -> None:
     )
     _create_root_issue(tmp_path / ".plan" / "issues" / "issue-root.md", number=10)
 
-    exit_code = main(["sync"])
+    runner = CliRunner()
+    result = runner.invoke(app, ["sync"])
 
-    assert exit_code == 0
-    captured = capsys.readouterr()
-    assert "Found 2 milestones and 2 issues." in captured.out
+    assert result.exit_code == 0
+    assert "Found 2 milestones and 2 issues." in result.output
 
 
 def test_sync_dry_run_reports_counts(tmp_path, monkeypatch, capsys) -> None:
@@ -66,12 +78,12 @@ def test_sync_dry_run_reports_counts(tmp_path, monkeypatch, capsys) -> None:
     )
     _create_root_issue(tmp_path / ".plan" / "issues" / "issue-root.md")
 
-    exit_code = main(["sync", "--dry-run"])
+    runner = CliRunner()
+    result = runner.invoke(app, ["sync", "--dry-run"])
 
-    assert exit_code == 0
-    captured = capsys.readouterr()
-    assert "Dry run: no changes will be written." in captured.out
-    assert "Found 1 milestones and 1 issues." in captured.out
+    assert result.exit_code == 0
+    assert "Dry run: no changes will be written." in result.output
+    assert "Found 1 milestones and 1 issues." in result.output
 
 
 def _create_milestone(
