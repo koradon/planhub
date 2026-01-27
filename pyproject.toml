@@ -37,3 +37,9 @@ planhub = "planhub.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/planhub"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "pytest-cov>=7.0.0",
+]
