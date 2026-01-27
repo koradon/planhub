@@ -41,13 +41,15 @@ def test_sync_reports_counts(tmp_path, monkeypatch, capsys) -> None:
     _create_milestone(
         tmp_path / ".plan" / "milestones" / "stage-1",
         milestone_title="Stage 1",
+        milestone_number=1,
         issue_names=("issue-001.md",),
     )
     _create_milestone(
         tmp_path / ".plan" / "milestones" / "stage-2",
         milestone_title="Stage 2",
+        milestone_number=2,
     )
-    _create_root_issue(tmp_path / ".plan" / "issues" / "issue-root.md")
+    _create_root_issue(tmp_path / ".plan" / "issues" / "issue-root.md", number=10)
 
     exit_code = main(["sync"])
 
@@ -75,23 +77,35 @@ def test_sync_dry_run_reports_counts(tmp_path, monkeypatch, capsys) -> None:
 def _create_milestone(
     directory: Path,
     milestone_title: str,
+    milestone_number: int | None = None,
     issue_names: tuple[str, ...] = (),
 ) -> None:
     directory.mkdir(parents=True, exist_ok=True)
+    milestone_lines = ["---", f"title: \"{milestone_title}\""]
+    if milestone_number is not None:
+        milestone_lines.append(f"number: {milestone_number}")
+    milestone_lines.append("---")
+    milestone_lines.append("")
+    milestone_lines.append("# Milestone")
     (directory / "milestone.md").write_text(
-        f"---\ntitle: \"{milestone_title}\"\n---\n\n# Milestone\n",
-        encoding="utf-8",
+        "\n".join(milestone_lines), encoding="utf-8"
     )
     if issue_names:
         issues_dir = directory / "issues"
         issues_dir.mkdir(parents=True, exist_ok=True)
         for index, name in enumerate(issue_names, start=1):
             (issues_dir / name).write_text(
-                f"---\ntitle: \"Issue {index}\"\n---\n\n# Issue\n",
+                f"---\ntitle: \"Issue {index}\"\nnumber: {index}\n---\n\n# Issue\n",
                 encoding="utf-8",
             )
 
 
-def _create_root_issue(path: Path) -> None:
+def _create_root_issue(path: Path, number: int | None = None) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("---\ntitle: \"Root Issue\"\n---\n\n# Issue\n", encoding="utf-8")
+    lines = ["---", 'title: "Root Issue"']
+    if number is not None:
+        lines.append(f"number: {number}")
+    lines.append("---")
+    lines.append("")
+    lines.append("# Issue")
+    path.write_text("\n".join(lines), encoding="utf-8")

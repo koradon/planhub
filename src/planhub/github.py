@@ -43,6 +43,7 @@ class GitHubClient:
         labels: Optional[list[str]] = None,
         assignees: Optional[list[str]] = None,
         milestone: Optional[int] = None,
+        issue_type: Optional[str] = None,
     ) -> Mapping[str, Any]:
         payload: dict[str, Any] = {"title": title}
         if body is not None:
@@ -53,6 +54,8 @@ class GitHubClient:
             payload["assignees"] = assignees
         if milestone is not None:
             payload["milestone"] = milestone
+        if issue_type is not None:
+            payload["type"] = issue_type
         return self._request("POST", f"/repos/{owner}/{repo}/issues", payload)
 
     def get_issue(self, owner: str, repo: str, number: int) -> Mapping[str, Any]:
@@ -67,6 +70,40 @@ class GitHubClient:
         state_reason: Optional["IssueStateReason"] = None,
     ) -> Mapping[str, Any]:
         payload: dict[str, Any] = {"state": state.value}
+        if state_reason is not None:
+            payload["state_reason"] = state_reason.value
+        return self._request("PATCH", f"/repos/{owner}/{repo}/issues/{number}", payload)
+
+    def update_issue(
+        self,
+        owner: str,
+        repo: str,
+        number: int,
+        *,
+        title: Optional[str] = None,
+        body: Optional[str] = None,
+        labels: Optional[list[str]] = None,
+        assignees: Optional[list[str]] = None,
+        milestone: Optional[int] = None,
+        issue_type: Optional[str] = None,
+        state: Optional["IssueState"] = None,
+        state_reason: Optional["IssueStateReason"] = None,
+    ) -> Mapping[str, Any]:
+        payload: dict[str, Any] = {}
+        if title is not None:
+            payload["title"] = title
+        if body is not None:
+            payload["body"] = body
+        if labels is not None:
+            payload["labels"] = labels
+        if assignees is not None:
+            payload["assignees"] = assignees
+        if milestone is not None:
+            payload["milestone"] = milestone
+        if issue_type is not None:
+            payload["type"] = issue_type
+        if state is not None:
+            payload["state"] = state.value
         if state_reason is not None:
             payload["state_reason"] = state_reason.value
         return self._request("PATCH", f"/repos/{owner}/{repo}/issues/{number}", payload)
@@ -125,6 +162,30 @@ class GitHubClient:
         if state is not None:
             payload["state"] = state
         return self._request("POST", f"/repos/{owner}/{repo}/milestones", payload)
+
+    def update_milestone(
+        self,
+        owner: str,
+        repo: str,
+        number: int,
+        *,
+        title: Optional[str] = None,
+        description: Optional[str] = None,
+        due_on: Optional[str] = None,
+        state: Optional[str] = None,
+    ) -> Mapping[str, Any]:
+        payload: dict[str, Any] = {}
+        if title is not None:
+            payload["title"] = title
+        if description is not None:
+            payload["description"] = description
+        if due_on is not None:
+            payload["due_on"] = due_on
+        if state is not None:
+            payload["state"] = state
+        return self._request(
+            "PATCH", f"/repos/{owner}/{repo}/milestones/{number}", payload
+        )
 
     def _request(
         self, method: str, path: str, payload: Optional[Mapping[str, Any]] = None

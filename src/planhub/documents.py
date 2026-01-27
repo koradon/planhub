@@ -88,6 +88,21 @@ def load_milestone_document(path: Path) -> MilestoneDocument:
     )
 
 
+def update_front_matter(path: Path, updates: Mapping[str, Any]) -> None:
+    metadata, body = _parse_front_matter(path, path.read_text(encoding="utf-8"))
+    merged = dict(metadata)
+    merged.update(updates)
+    path.write_text(render_markdown(merged, body), encoding="utf-8")
+
+
+def render_markdown(front_matter: Mapping[str, Any], body: str) -> str:
+    yaml_text = yaml.safe_dump(front_matter, sort_keys=False).strip()
+    sections = ["---", yaml_text, "---", ""]
+    if body:
+        sections.append(body)
+    return "\n".join(sections) + "\n"
+
+
 def _parse_front_matter(path: Path, text: str) -> tuple[Mapping[str, Any], str]:
     lines = text.splitlines()
     if not lines or lines[0].strip() != "---":

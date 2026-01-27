@@ -36,10 +36,14 @@ uv pip install planhub
   - Creates the standard `.plan/` structure in the current repo.
   - Use `--dry-run` to preview the folders that would be created.
 - `planhub sync`
-  - Reads `.plan/` files and creates/updates GitHub issues and milestones.
+  - Reads `.plan/` files and creates or updates GitHub issues and milestones.
+  - Writes the GitHub `number` back into each file after creation.
+  - Sync runs in three phases: parse files, build a sync plan, then apply it.
   - Use `--dry-run` to validate files without writing changes.
   - Use `--import-existing` to pull existing GitHub issues into `.plan/`.
     This requires credentials and a GitHub `remote.origin.url`.
+  - Creating issues or milestones also requires credentials and a GitHub
+    `remote.origin.url`.
   - Sync never deletes local files. If something can’t be identified, it
     reports an error and skips removal.
 

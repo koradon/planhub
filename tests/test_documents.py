@@ -2,7 +2,12 @@ from pathlib import Path
 
 import pytest
 
-from planhub.documents import DocumentError, load_issue_document, load_milestone_document
+from planhub.documents import (
+    DocumentError,
+    load_issue_document,
+    load_milestone_document,
+    update_front_matter,
+)
 from planhub.github import IssueState, IssueStateReason
 
 
@@ -65,3 +70,25 @@ def test_load_issue_document_requires_title(tmp_path) -> None:
 
     with pytest.raises(DocumentError):
         load_issue_document(issue_path)
+
+
+def test_update_front_matter_preserves_body(tmp_path) -> None:
+    issue_path = tmp_path / "issue.md"
+    issue_path.write_text(
+        "\n".join(
+            [
+                "---",
+                'title: "Ship it"',
+                "---",
+                "",
+                "Body text.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    update_front_matter(issue_path, {"number": 42})
+
+    issue = load_issue_document(issue_path)
+    assert issue.number == 42
+    assert "Body text." in issue.body

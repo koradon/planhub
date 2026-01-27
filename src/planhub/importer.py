@@ -5,9 +5,7 @@ from pathlib import Path
 from datetime import datetime
 from typing import Any, Mapping, Optional
 
-import yaml
-
-from planhub.documents import IssueDocument, MilestoneDocument
+from planhub.documents import IssueDocument, MilestoneDocument, render_markdown
 from planhub.layout import PlanLayout
 
 
@@ -145,7 +143,7 @@ def _write_issue(issue: IssueDocument) -> None:
         front_matter["state"] = issue.state.value
     if issue.state_reason:
         front_matter["state_reason"] = issue.state_reason.value
-    content = _render_markdown(front_matter, issue.body)
+    content = render_markdown(front_matter, issue.body)
     issue.path.parent.mkdir(parents=True, exist_ok=True)
     issue.path.write_text(content, encoding="utf-8")
 
@@ -158,17 +156,9 @@ def _write_milestone(milestone: MilestoneDocument) -> None:
         front_matter["due_on"] = milestone.due_on
     if milestone.state:
         front_matter["state"] = milestone.state.value
-    content = _render_markdown(front_matter, "")
+    content = render_markdown(front_matter, "")
     milestone.path.parent.mkdir(parents=True, exist_ok=True)
     milestone.path.write_text(content, encoding="utf-8")
-
-
-def _render_markdown(front_matter: Mapping[str, Any], body: str) -> str:
-    yaml_text = yaml.safe_dump(front_matter, sort_keys=False).strip()
-    sections = ["---", yaml_text, "---", ""]
-    if body:
-        sections.append(body)
-    return "\n".join(sections) + "\n"
 
 
 def _slugify(value: str) -> str:
