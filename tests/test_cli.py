@@ -10,6 +10,7 @@ def test_init_creates_layout(tmp_path, monkeypatch, capsys) -> None:
 
     assert exit_code == 0
     assert (tmp_path / ".plan" / "milestones").is_dir()
+    assert (tmp_path / ".plan" / "issues").is_dir()
     captured = capsys.readouterr()
     assert "Initialized plan layout" in captured.out
 
@@ -46,12 +47,13 @@ def test_sync_reports_counts(tmp_path, monkeypatch, capsys) -> None:
         tmp_path / ".plan" / "milestones" / "stage-2",
         milestone_title="Stage 2",
     )
+    _create_root_issue(tmp_path / ".plan" / "issues" / "issue-root.md")
 
     exit_code = main(["sync"])
 
     assert exit_code == 0
     captured = capsys.readouterr()
-    assert "Found 2 milestones and 1 issues." in captured.out
+    assert "Found 2 milestones and 2 issues." in captured.out
 
 
 def test_sync_dry_run_reports_counts(tmp_path, monkeypatch, capsys) -> None:
@@ -60,13 +62,14 @@ def test_sync_dry_run_reports_counts(tmp_path, monkeypatch, capsys) -> None:
         tmp_path / ".plan" / "milestones" / "stage-1",
         milestone_title="Stage 1",
     )
+    _create_root_issue(tmp_path / ".plan" / "issues" / "issue-root.md")
 
     exit_code = main(["sync", "--dry-run"])
 
     assert exit_code == 0
     captured = capsys.readouterr()
     assert "Dry run: no changes will be written." in captured.out
-    assert "Found 1 milestones and 0 issues." in captured.out
+    assert "Found 1 milestones and 1 issues." in captured.out
 
 
 def _create_milestone(
@@ -87,3 +90,8 @@ def _create_milestone(
                 f"---\ntitle: \"Issue {index}\"\n---\n\n# Issue\n",
                 encoding="utf-8",
             )
+
+
+def _create_root_issue(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("---\ntitle: \"Root Issue\"\n---\n\n# Issue\n", encoding="utf-8")

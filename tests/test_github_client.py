@@ -15,6 +15,7 @@ from unittest.mock import patch
 class DummyResponse:
     def __init__(self, payload: dict) -> None:
         self._payload = payload
+        self.headers = {}
 
     def read(self) -> bytes:
         return json.dumps(self._payload).encode("utf-8")

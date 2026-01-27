@@ -71,6 +71,29 @@ class GitHubClient:
             payload["state_reason"] = state_reason.value
         return self._request("PATCH", f"/repos/{owner}/{repo}/issues/{number}", payload)
 
+    def list_issues(
+        self, owner: str, repo: str, state: str = "open"
+    ) -> list[Mapping[str, Any]]:
+        issues: list[Mapping[str, Any]] = []
+        page = 1
+        while True:
+            path = (
+                f"/repos/{owner}/{repo}/issues"
+                f"?state={state}&per_page=100&page={page}"
+            )
+            data, headers = self._request_with_headers("GET", path)
+            if not isinstance(data, list):
+                raise GitHubAPIError(
+                    status_code=500,
+                    message="Unexpected issues response.",
+                    response_body={"data": data},
+                )
+            issues.extend(data)
+            if not _has_next_link(headers.get("Link")):
+                break
+            page += 1
+        return issues
+
     def close_issue(
         self,
         owner: str,
@@ -105,7 +128,13 @@ class GitHubClient:
 
     def _request(
         self, method: str, path: str, payload: Optional[Mapping[str, Any]] = None
-    ) -> Mapping[str, Any]:
+    ) -> Any:
+        data, _headers = self._request_with_headers(method, path, payload)
+        return data
+
+    def _request_with_headers(
+        self, method: str, path: str, payload: Optional[Mapping[str, Any]] = None
+    ) -> tuple[Any, Mapping[str, str]]:
         url = f"{self._base_url}{path}"
         data = json.dumps(payload).encode("utf-8") if payload is not None else None
         request = Request(
@@ -121,6 +150,7 @@ class GitHubClient:
         try:
             with urlopen(request) as response:
                 raw_body = response.read()
+                headers = dict(response.headers.items())
         except HTTPError as error:
             body = self._parse_body(error.read())
             message = "unknown error"
@@ -129,10 +159,19 @@ class GitHubClient:
             raise GitHubAPIError(
                 status_code=error.code, message=message, response_body=body
             ) from error
-        return self._parse_body(raw_body)
+        return self._parse_body(raw_body), headers
 
     @staticmethod
-    def _parse_body(raw_body: bytes) -> Mapping[str, Any]:
+    def _parse_body(raw_body: bytes) -> Any:
         if not raw_body:
             return {}
         return json.loads(raw_body.decode("utf-8"))
+
+
+def _has_next_link(link_header: Optional[str]) -> bool:
+    if not link_header:
+        return False
+    for part in link_header.split(","):
+        if 'rel="next"' in part:
+            return True
+    return False

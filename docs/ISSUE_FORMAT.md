@@ -1,6 +1,7 @@
 # Issue File Format
 
-Each issue is a standalone markdown file under `issues/`.
+Each issue is a standalone markdown file under `.plan/issues/` or
+`.plan/milestones/<milestone>/issues/`.
 
 ## Front Matter
 Use YAML front matter to store metadata. The sync tool will map these fields to

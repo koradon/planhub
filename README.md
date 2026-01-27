@@ -9,19 +9,22 @@ milestones written as `.md` files) to GitHub Issues via the API.
 - Make planning conversational: we can edit `.md` files and sync later.
 
 ## How It Works
-Planhub stores planning artifacts inside each target repository under `.plan/`.
-The CLI initializes the layout and then syncs the local files with GitHub.
+Planhub keeps planning data next to the code it describes. Each repository gets
+a `.plan/` folder containing milestones and issues as Markdown files with YAML
+front matter. You edit these files like normal docs, then `planhub sync` maps
+them to GitHub issues and milestones.
 
 ## Installation
-Global install from PyPI (recommended for CLI usage). `pipx` keeps CLI tools in
-isolated environments while still putting `planhub` on your PATH, so your
-global site-packages stay clean:
+Global install from PyPI (recommended for CLI usage). `pipx` gives you a clean
+CLI install without polluting your system Python, and puts `planhub` on your
+PATH:
 
 ```
 pipx install planhub
 ```
 
-Project-local install with uv (inside your repo):
+Project-local install with uv (inside your repo). This keeps the tool in a
+virtual environment for that repo:
 
 ```
 uv venv
@@ -31,16 +34,39 @@ uv pip install planhub
 ## Commands
 - `planhub init`
   - Creates the standard `.plan/` structure in the current repo.
-  - Use `--dry-run` to preview what would be created.
+  - Use `--dry-run` to preview the folders that would be created.
 - `planhub sync`
-  - Reads the `.md` files and creates/updates GitHub issues/milestones.
+  - Reads `.plan/` files and creates/updates GitHub issues and milestones.
   - Use `--dry-run` to validate files without writing changes.
-  - Sync never deletes local files; if items cannot be identified, it skips
-    removal and reports errors.
+  - Use `--import-existing` to pull existing GitHub issues into `.plan/`.
+    This requires credentials and a GitHub `remote.origin.url`.
+  - Sync never deletes local files. If something can’t be identified, it
+    reports an error and skips removal.
+
+## Credentials
+Planhub can reuse your GitHub CLI session or a token stored in the environment.
+The simplest path is to authenticate once with `gh`, and the CLI will fetch a
+token automatically.
+
+```
+gh auth login
+```
+
+Alternatively, create a personal access token and export it:
+
+1. GitHub → Settings → Developer settings → Personal access tokens.
+2. Create a fine-grained token for the target repo(s).
+3. Grant Issues: Read (and Write if you will push updates later).
+
+```
+export GITHUB_TOKEN=ghp_your_token_here
+```
 
 ## Suggested Data Repo Layout
 ```
 .plan/
+  issues/
+    20260127-backlog-issue.md
   milestones/
     stage-1/
       milestone.md

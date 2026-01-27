@@ -6,6 +6,7 @@ from typing import Iterable
 
 PLAN_DIR_NAME = ".plan"
 MILESTONES_DIR_NAME = "milestones"
+ROOT_ISSUES_DIR_NAME = "issues"
 ISSUES_DIR_NAME = "issues"
 MILESTONE_FILENAME = "milestone.md"
 
@@ -14,6 +15,7 @@ MILESTONE_FILENAME = "milestone.md"
 class PlanLayout:
     root: Path
     milestones_dir: Path
+    issues_dir: Path
 
 
 @dataclass(frozen=True)
@@ -26,18 +28,27 @@ class MilestoneEntry:
 def ensure_layout(repo_root: Path) -> PlanLayout:
     plan_root = repo_root / PLAN_DIR_NAME
     milestones_dir = plan_root / MILESTONES_DIR_NAME
+    issues_dir = plan_root / ROOT_ISSUES_DIR_NAME
     milestones_dir.mkdir(parents=True, exist_ok=True)
-    return PlanLayout(root=plan_root, milestones_dir=milestones_dir)
+    issues_dir.mkdir(parents=True, exist_ok=True)
+    return PlanLayout(
+        root=plan_root, milestones_dir=milestones_dir, issues_dir=issues_dir
+    )
 
 
 def load_layout(repo_root: Path) -> PlanLayout:
     plan_root = repo_root / PLAN_DIR_NAME
     milestones_dir = plan_root / MILESTONES_DIR_NAME
+    issues_dir = plan_root / ROOT_ISSUES_DIR_NAME
     if not plan_root.exists():
         raise FileNotFoundError(f"Missing {PLAN_DIR_NAME} directory")
     if not milestones_dir.exists():
         raise FileNotFoundError(f"Missing {MILESTONES_DIR_NAME} directory")
-    return PlanLayout(root=plan_root, milestones_dir=milestones_dir)
+    if not issues_dir.exists():
+        raise FileNotFoundError(f"Missing {ROOT_ISSUES_DIR_NAME} directory")
+    return PlanLayout(
+        root=plan_root, milestones_dir=milestones_dir, issues_dir=issues_dir
+    )
 
 
 def discover_milestones(layout: PlanLayout) -> tuple[MilestoneEntry, ...]:
@@ -53,6 +64,10 @@ def discover_milestones(layout: PlanLayout) -> tuple[MilestoneEntry, ...]:
             )
         )
     return tuple(entries)
+
+
+def discover_root_issues(layout: PlanLayout) -> tuple[Path, ...]:
+    return _sorted_files(layout.issues_dir, "*.md")
 
 
 def _sorted_dirs(directory: Path) -> Iterable[Path]:
