@@ -96,6 +96,7 @@ def _import_existing_issues_if_requested(
     typer.echo(
         "Imported issues:"
         f" {result.issues_created} created,"
+        f" {result.issues_moved} moved,"
         f" {result.issues_skipped} skipped,"
         f" {result.milestones_created} milestones created."
     )

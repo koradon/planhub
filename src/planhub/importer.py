@@ -6,13 +6,22 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Mapping, Optional
 
-from planhub.documents import IssueDocument, MilestoneDocument, render_markdown
+from planhub.documents import (
+    DocumentError,
+    IssueDocument,
+    MilestoneDocument,
+    load_issue_document,
+    render_markdown,
+    update_front_matter,
+)
+from planhub.layout import discover_milestones, discover_root_issues
 from planhub.layout import PlanLayout
 
 
 @dataclass(frozen=True)
 class ImportResult:
     issues_created: int
+    issues_moved: int
     milestones_created: int
     issues_skipped: int
 
@@ -27,11 +36,19 @@ def import_existing_issues(
 ) -> ImportResult:
     issues = client.list_issues(owner, repo, state="all")
     issues_created = 0
+    issues_moved = 0
     milestones_created = 0
     issues_skipped = 0
+    existing_issues = _collect_existing_issues(layout)
+    existing_by_content = _collect_existing_by_content(layout)
 
     for issue in issues:
         if issue.get("pull_request"):
+            continue
+
+        number = issue.get("number")
+        if not number:
+            issues_skipped += 1
             continue
 
         milestone = issue.get("milestone")
@@ -46,10 +63,29 @@ def import_existing_issues(
                 if milestone_dir and milestone_dir[1]:
                     milestones_created += 1
 
-        number = issue.get("number")
-        if not number:
-            issues_skipped += 1
+        if number in existing_issues:
+            existing_path = existing_issues[number]
+            if _maybe_move_issue(
+                existing_path, milestone_dir, dry_run=dry_run
+            ):
+                issues_moved += 1
+            else:
+                issues_skipped += 1
             continue
+        if (issue.get("title") or "") and issue.get("body") is not None:
+            content_key = _content_key(issue.get("title", ""), issue.get("body"))
+            if content_key in existing_by_content:
+                existing_path = existing_by_content[content_key]
+                if not dry_run:
+                    update_front_matter(existing_path, {"number": number})
+                if _maybe_move_issue(
+                    existing_path, milestone_dir, dry_run=dry_run
+                ):
+                    issues_moved += 1
+                else:
+                    issues_skipped += 1
+                continue
+
         target_dir = milestone_dir[0] if milestone_dir else layout.issues_dir
         issue_path = _issue_path_for_import(target_dir, issue)
         if issue_path.exists():
@@ -65,6 +101,7 @@ def import_existing_issues(
 
     return ImportResult(
         issues_created=issues_created,
+        issues_moved=issues_moved,
         milestones_created=milestones_created,
         issues_skipped=issues_skipped,
     )
@@ -93,6 +130,70 @@ def _ensure_milestone_dir(
     if not issues_dir.exists() and not dry_run:
         issues_dir.mkdir(parents=True, exist_ok=True)
     return issues_dir, created
+
+
+def _maybe_move_issue(
+    existing_path: Path,
+    milestone_dir: Optional[tuple[Path, bool]],
+    *,
+    dry_run: bool,
+) -> bool:
+    if milestone_dir is None:
+        return False
+    target_dir = milestone_dir[0]
+    target_path = target_dir / existing_path.name
+    if existing_path == target_path or target_path.exists():
+        return False
+    if not dry_run:
+        target_dir.mkdir(parents=True, exist_ok=True)
+        existing_path.rename(target_path)
+    return True
+
+
+def _collect_existing_issues(layout: PlanLayout) -> dict[int, Path]:
+    numbers: dict[int, Path] = {}
+    for issue_path in discover_root_issues(layout):
+        _try_add_issue_number(issue_path, numbers)
+    for entry in discover_milestones(layout):
+        for issue_path in entry.issue_files:
+            _try_add_issue_number(issue_path, numbers)
+    return numbers
+
+
+def _collect_existing_by_content(layout: PlanLayout) -> dict[tuple[str, str], Path]:
+    entries: dict[tuple[str, str], Path] = {}
+    for issue_path in discover_root_issues(layout):
+        _try_add_issue_content(issue_path, entries)
+    for entry in discover_milestones(layout):
+        for issue_path in entry.issue_files:
+            _try_add_issue_content(issue_path, entries)
+    return entries
+
+
+def _try_add_issue_number(issue_path: Path, numbers: dict[int, Path]) -> None:
+    try:
+        issue_doc = load_issue_document(issue_path)
+    except DocumentError:
+        return
+    if issue_doc.number is not None:
+        numbers.setdefault(issue_doc.number, issue_path)
+
+
+def _try_add_issue_content(
+    issue_path: Path, entries: dict[tuple[str, str], Path]
+) -> None:
+    try:
+        issue_doc = load_issue_document(issue_path)
+    except DocumentError:
+        return
+    if issue_doc.number is not None:
+        return
+    key = _content_key(issue_doc.title, issue_doc.body)
+    entries.setdefault(key, issue_path)
+
+
+def _content_key(title: str, body: Optional[str]) -> tuple[str, str]:
+    return title.strip(), (body or "").strip()
 
 
 def _issue_document_from_api(
