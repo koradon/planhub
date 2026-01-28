@@ -98,8 +98,26 @@ def load_milestone_document(path: Path) -> MilestoneDocument:
     )
 
 
-def update_front_matter(path: Path, updates: Mapping[str, Any]) -> None:
-    metadata, body = _parse_front_matter(path, path.read_text(encoding="utf-8"))
+def update_front_matter(
+    path: Path,
+    updates: Mapping[str, Any],
+    *,
+    cached_metadata: Optional[Mapping[str, Any]] = None,
+    cached_body: Optional[str] = None,
+) -> None:
+    """Update front matter in a markdown file.
+
+    Args:
+        path: Path to the file to update.
+        updates: Dictionary of key-value pairs to update in the front matter.
+        cached_metadata: Optional pre-parsed metadata to avoid re-reading the file.
+        cached_body: Optional pre-parsed body to avoid re-reading the file.
+    """
+    if cached_metadata is not None and cached_body is not None:
+        metadata = cached_metadata
+        body = cached_body
+    else:
+        metadata, body = _parse_front_matter(path, path.read_text(encoding="utf-8"))
     merged = dict(metadata)
     merged.update(updates)
     path.write_text(render_markdown(merged, body), encoding="utf-8")
@@ -111,6 +129,47 @@ def render_markdown(front_matter: Mapping[str, Any], body: str) -> str:
     if body:
         sections.append(body)
     return "\n".join(sections) + "\n"
+
+
+def issue_document_to_metadata(doc: IssueDocument) -> dict[str, Any]:
+    """Convert an IssueDocument back to front matter metadata dict."""
+    metadata: dict[str, Any] = {"title": doc.title}
+    if doc.issue_id is not None:
+        metadata["id"] = doc.issue_id
+    if doc.number is not None:
+        metadata["number"] = doc.number
+    if doc.labels_set:
+        metadata["labels"] = list(doc.labels)
+    if doc.milestone_set:
+        if doc.milestone_number is not None:
+            metadata["milestone"] = doc.milestone_number
+        else:
+            metadata["milestone"] = doc.milestone
+    if doc.assignees_set:
+        metadata["assignees"] = list(doc.assignees)
+    if doc.issue_type is not None:
+        metadata["type"] = doc.issue_type
+    if doc.state is not None:
+        metadata["state"] = doc.state.value
+    if doc.state_reason is not None:
+        metadata["state_reason"] = doc.state_reason.value
+    return metadata
+
+
+def milestone_document_to_metadata(doc: MilestoneDocument) -> dict[str, Any]:
+    """Convert a MilestoneDocument back to front matter metadata dict."""
+    metadata: dict[str, Any] = {"title": doc.title}
+    if doc.milestone_id is not None:
+        metadata["id"] = doc.milestone_id
+    if doc.number is not None:
+        metadata["number"] = doc.number
+    if doc.description is not None:
+        metadata["description"] = doc.description
+    if doc.due_on is not None:
+        metadata["due_on"] = doc.due_on
+    if doc.state is not None:
+        metadata["state"] = doc.state.value
+    return metadata
 
 
 def _parse_front_matter(path: Path, text: str) -> tuple[Mapping[str, Any], str]:

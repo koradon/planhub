@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Mapping, Optional
 
 from planhub.documents import IssueDocument, MilestoneDocument, render_markdown
@@ -175,8 +176,7 @@ def _slugify(value: str) -> str:
         elif char in {" ", "-", "_"}:
             slug.append("-")
     normalized = "".join(slug).strip("-")
-    while "--" in normalized:
-        normalized = normalized.replace("--", "-")
+    normalized = re.sub(r"-+", "-", normalized)
     return normalized or "milestone"
 
 

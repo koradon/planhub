@@ -24,10 +24,9 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
-    "build>=1.4.0",
     "typer>=0.12.3",
     "pyyaml>=6.0",
-    "twine>=6.2.0",
+    "requests>=2.31.0",
 ]
 
 [project.urls]
@@ -44,4 +43,8 @@ packages = ["src/planhub"]
 dev = [
     "pytest>=9.0.2",
     "pytest-cov>=7.0.0",
+]
+publish = [
+    "build>=1.4.0",
+    "twine>=6.2.0",
 ]

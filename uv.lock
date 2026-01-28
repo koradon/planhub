@@ -555,9 +555,8 @@ name = "planhub"
 version = "0.0.1"
 source = { editable = "." }
 dependencies = [
-    { name = "build" },
     { name = "pyyaml" },
-    { name = "twine" },
+    { name = "requests" },
     { name = "typer" },
 ]
 
@@ -566,12 +565,15 @@ dev = [
     { name = "pytest" },
     { name = "pytest-cov" },
 ]
+publish = [
+    { name = "build" },
+    { name = "twine" },
+]
 
 [package.metadata]
 requires-dist = [
-    { name = "build", specifier = ">=1.4.0" },
     { name = "pyyaml", specifier = ">=6.0" },
-    { name = "twine", specifier = ">=6.2.0" },
+    { name = "requests", specifier = ">=2.31.0" },
     { name = "typer", specifier = ">=0.12.3" },
 ]
 
@@ -579,6 +581,10 @@ requires-dist = [
 dev = [
     { name = "pytest", specifier = ">=9.0.2" },
     { name = "pytest-cov", specifier = ">=7.0.0" },
+]
+publish = [
+    { name = "build", specifier = ">=1.4.0" },
+    { name = "twine", specifier = ">=6.2.0" },
 ]
 
 [[package]]

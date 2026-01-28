@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-import json
+import time
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Mapping, Optional
-from urllib.error import HTTPError
-from urllib.request import Request, urlopen
+
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 
 @dataclass(frozen=True)
@@ -29,10 +31,43 @@ class IssueStateReason(Enum):
     REOPENED = "reopened"
 
 
+def _create_session(max_retries: int = 3) -> requests.Session:
+    """Create a requests session with connection pooling and retry logic."""
+    session = requests.Session()
+    retry_strategy = Retry(
+        total=max_retries,
+        backoff_factor=1.0,
+        status_forcelist=[500, 502, 503, 504],
+        allowed_methods=["GET"],
+        raise_on_status=False,
+    )
+    adapter = HTTPAdapter(
+        max_retries=retry_strategy,
+        pool_connections=10,
+        pool_maxsize=10,
+    )
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+    return session
+
+
 class GitHubClient:
-    def __init__(self, token: str, base_url: str = "https://api.github.com") -> None:
+    def __init__(
+        self,
+        token: str,
+        base_url: str = "https://api.github.com",
+        session: Optional[requests.Session] = None,
+    ) -> None:
         self._token = token
         self._base_url = base_url.rstrip("/")
+        self._session = session or _create_session()
+        self._session.headers.update(
+            {
+                "Accept": "application/vnd.github+json",
+                "Authorization": f"Bearer {self._token}",
+                "User-Agent": "planhub",
+            }
+        )
 
     def create_issue(
         self,
@@ -198,35 +233,58 @@ class GitHubClient:
         self, method: str, path: str, payload: Optional[Mapping[str, Any]] = None
     ) -> tuple[Any, Mapping[str, str]]:
         url = f"{self._base_url}{path}"
-        data = json.dumps(payload).encode("utf-8") if payload is not None else None
-        request = Request(
-            url,
-            data=data,
-            method=method,
-            headers={
-                "Accept": "application/vnd.github+json",
-                "Authorization": f"Bearer {self._token}",
-                "User-Agent": "planhub",
-            },
-        )
-        try:
-            with urlopen(request) as response:
-                raw_body = response.read()
-                headers = dict(response.headers.items())
-        except HTTPError as error:
-            body = self._parse_body(error.read())
+        response = self._request_once(method, url, payload)
+        wait_seconds = self._handle_rate_limit(response)
+        if wait_seconds is not None:
+            time.sleep(wait_seconds)
+            response = self._request_once(method, url, payload)
+        if not response.ok:
+            body = self._parse_body(response.content)
             message = "unknown error"
             if isinstance(body, dict) and body.get("message"):
                 message = str(body["message"])
             raise GitHubAPIError(
-                status_code=error.code, message=message, response_body=body
-            ) from error
-        return self._parse_body(raw_body), headers
+                status_code=response.status_code, message=message, response_body=body
+            )
+        headers = dict(response.headers)
+        return self._parse_body(response.content), headers
+
+    def _request_once(
+        self, method: str, url: str, payload: Optional[Mapping[str, Any]]
+    ) -> requests.Response:
+        return self._session.request(
+            method=method,
+            url=url,
+            json=payload,
+            timeout=30,
+        )
+
+    def _handle_rate_limit(self, response: requests.Response) -> Optional[int]:
+        """Return wait time in seconds when rate limited, otherwise None."""
+        if response.status_code == 403:
+            remaining = response.headers.get("X-RateLimit-Remaining")
+            if remaining == "0":
+                reset_time = response.headers.get("X-RateLimit-Reset")
+                if reset_time:
+                    wait_seconds = int(reset_time) - int(time.time()) + 1
+                    if 0 < wait_seconds <= 60:
+                        return wait_seconds
+                raise GitHubAPIError(
+                    status_code=403,
+                    message="Rate limit exceeded. Try again later.",
+                    response_body=None,
+                )
+        elif response.status_code == 429:
+            retry_after = response.headers.get("Retry-After", "60")
+            wait_seconds = min(int(retry_after), 60)
+            return wait_seconds
+        return None
 
     @staticmethod
     def _parse_body(raw_body: bytes) -> Any:
         if not raw_body:
             return {}
+        import json
         return json.loads(raw_body.decode("utf-8"))
 
 

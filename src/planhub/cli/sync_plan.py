@@ -1,17 +1,24 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+from threading import Lock
+from typing import Callable
 
 from planhub.documents import (
     DocumentError,
     IssueDocument,
     MilestoneDocument,
+    issue_document_to_metadata,
     load_issue_document,
     load_milestone_document,
+    milestone_document_to_metadata,
     update_front_matter,
 )
 from planhub.github import GitHubClient, IssueState
 from planhub.layout import PlanLayout, discover_milestones, discover_root_issues
+
+MAX_WORKERS = 5  # Conservative limit to avoid GitHub rate limits
 
 
 class SyncPlan:
@@ -144,7 +151,13 @@ def _create_missing_milestones(
         )
         number = created.get("number")
         if isinstance(number, int):
-            update_front_matter(milestone_path, {"number": number})
+            cached_metadata = milestone_document_to_metadata(milestone_doc)
+            update_front_matter(
+                milestone_path,
+                {"number": number},
+                cached_metadata=cached_metadata,
+                cached_body=milestone_doc.body,
+            )
             plan.milestone_numbers[milestone_doc.title] = number
         else:
             errors.append(f"{milestone_path}: GitHub did not return a number.")
@@ -157,10 +170,15 @@ def _update_existing_milestones(
     plan: SyncPlan,
     errors: list[str],
 ) -> None:
-    for milestone_path, milestone_doc in plan.milestones_to_update:
+    errors_lock = Lock()
+
+    def update_single_milestone(
+        milestone_path: Path, milestone_doc: MilestoneDocument
+    ) -> None:
         if milestone_doc.number is None:
-            errors.append(f"{milestone_path}: missing milestone number.")
-            continue
+            with errors_lock:
+                errors.append(f"{milestone_path}: missing milestone number.")
+            return
         client.update_milestone(
             owner,
             repo,
@@ -170,6 +188,13 @@ def _update_existing_milestones(
             due_on=milestone_doc.due_on,
             state=milestone_doc.state.value if milestone_doc.state else None,
         )
+
+    _run_parallel(
+        plan.milestones_to_update,
+        lambda item: update_single_milestone(item[0], item[1]),
+        errors,
+        errors_lock,
+    )
 
 
 def _resolve_milestone_number(
@@ -199,14 +224,23 @@ def _create_missing_issues(
     plan: SyncPlan,
     errors: list[str],
 ) -> None:
-    for issue_path, issue_doc, milestone_title in plan.issues_to_create:
+    errors_lock = Lock()
+
+    def create_single_issue(
+        issue_path: Path, issue_doc: IssueDocument, milestone_title: str | None
+    ) -> None:
+        local_errors: list[str] = []
         milestone_number, clear_milestone = _resolve_milestone_number(
-            plan, issue_path, issue_doc, milestone_title, errors
+            plan, issue_path, issue_doc, milestone_title, local_errors
         )
+        if local_errors:
+            with errors_lock:
+                errors.extend(local_errors)
+            return
         if clear_milestone:
             milestone_number = None
         if (issue_doc.milestone or milestone_title) and milestone_number is None:
-            continue
+            return
         labels = list(issue_doc.labels) if issue_doc.labels_set else None
         assignees = list(issue_doc.assignees) if issue_doc.assignees_set else None
         created = client.create_issue(
@@ -221,10 +255,17 @@ def _create_missing_issues(
         )
         issue_number = created.get("number")
         if isinstance(issue_number, int):
-            update_front_matter(issue_path, {"number": issue_number})
+            cached_metadata = issue_document_to_metadata(issue_doc)
+            update_front_matter(
+                issue_path,
+                {"number": issue_number},
+                cached_metadata=cached_metadata,
+                cached_body=issue_doc.body,
+            )
         else:
-            errors.append(f"{issue_path}: GitHub did not return a number.")
-            continue
+            with errors_lock:
+                errors.append(f"{issue_path}: GitHub did not return a number.")
+            return
         if issue_doc.state and issue_doc.state.value == "closed":
             client.update_issue_state(
                 owner,
@@ -234,6 +275,13 @@ def _create_missing_issues(
                 state_reason=issue_doc.state_reason,
             )
 
+    _run_parallel(
+        plan.issues_to_create,
+        lambda item: create_single_issue(item[0], item[1], item[2]),
+        errors,
+        errors_lock,
+    )
+
 
 def _update_existing_issues(
     client: GitHubClient,
@@ -242,15 +290,25 @@ def _update_existing_issues(
     plan: SyncPlan,
     errors: list[str],
 ) -> None:
-    for issue_path, issue_doc, milestone_title in plan.issues_to_update:
+    errors_lock = Lock()
+
+    def update_single_issue(
+        issue_path: Path, issue_doc: IssueDocument, milestone_title: str | None
+    ) -> None:
         if issue_doc.number is None:
-            errors.append(f"{issue_path}: missing issue number.")
-            continue
+            with errors_lock:
+                errors.append(f"{issue_path}: missing issue number.")
+            return
+        local_errors: list[str] = []
         milestone_number, clear_milestone = _resolve_milestone_number(
-            plan, issue_path, issue_doc, milestone_title, errors
+            plan, issue_path, issue_doc, milestone_title, local_errors
         )
+        if local_errors:
+            with errors_lock:
+                errors.extend(local_errors)
+            return
         if (issue_doc.milestone or milestone_title) and milestone_number is None:
-            continue
+            return
         labels = list(issue_doc.labels) if issue_doc.labels_set else None
         assignees = list(issue_doc.assignees) if issue_doc.assignees_set else None
         client.update_issue(
@@ -267,3 +325,30 @@ def _update_existing_issues(
             state=issue_doc.state,
             state_reason=issue_doc.state_reason,
         )
+
+    _run_parallel(
+        plan.issues_to_update,
+        lambda item: update_single_issue(item[0], item[1], item[2]),
+        errors,
+        errors_lock,
+    )
+
+
+def _run_parallel(
+    items: list,
+    func: Callable,
+    errors: list[str],
+    errors_lock: Lock,
+) -> None:
+    """Run a function in parallel over a list of items."""
+    if not items:
+        return
+
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        futures = {executor.submit(func, item): item for item in items}
+        for future in as_completed(futures):
+            try:
+                future.result()
+            except Exception as exc:
+                with errors_lock:
+                    errors.append(f"Parallel execution error: {exc}")
