@@ -5,6 +5,7 @@ General
 - Keep changes minimal and focused on the request.
 - Do not reformat unrelated code.
 - Try to design in Domain Driven Development way.
+- Update README.md if user facing changes were added.
 
 Dependencies and tooling
 - Use `uv` for dependency management and running tools.
@@ -17,6 +18,7 @@ Testing
 - Write function-style tests (avoid class-based suites).
 - Prefer the `patch` decorator when mocking.
 - Keep tests in the `/tests` directory at the project root.
+- Always run tests after making changes to the code.
 
 Coverage
 - Use `coverage` via `pytest --cov` when coverage is requested.

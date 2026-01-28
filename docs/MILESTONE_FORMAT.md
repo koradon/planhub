@@ -10,8 +10,6 @@ GitHub's REST API:
 ---
 id: "planhub-milestone-001"     # stable local id (before GitHub number exists)
 number: 12                      # GitHub milestone number (filled after sync)
-owner: "your-org"
-repo: "your-repo"
 title: "Stage 1"
 description: "Schema + migrations for places and facts."
 due_on: "2026-03-01T00:00:00Z"  # ISO 8601 timestamp

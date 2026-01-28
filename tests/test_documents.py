@@ -1,0 +1,119 @@
+from pathlib import Path
+
+import pytest
+
+from planhub.documents import (
+    DocumentError,
+    load_issue_document,
+    load_milestone_document,
+    update_front_matter,
+)
+from planhub.github import IssueState, IssueStateReason
+
+
+def test_load_issue_document_parses_fields(tmp_path) -> None:
+    issue_path = tmp_path / "issue.md"
+    issue_path.write_text(
+        "\n".join(
+            [
+                "---",
+                'title: "Ship it"',
+                "labels: [p1, backend]",
+                "assignees: [alice]",
+                'state: "closed"',
+                'state_reason: "not_planned"',
+                'number: "12"',
+                "---",
+                "",
+                "Details here.",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    issue = load_issue_document(issue_path)
+
+    assert issue.title == "Ship it"
+    assert issue.labels == ("p1", "backend")
+    assert issue.labels_set is True
+    assert issue.assignees == ("alice",)
+    assert issue.assignees_set is True
+    assert issue.state == IssueState.CLOSED
+    assert issue.state_reason == IssueStateReason.NOT_PLANNED
+    assert issue.number == 12
+    assert "Details here." in issue.body
+
+
+def test_load_milestone_document_uses_body_for_description(tmp_path) -> None:
+    milestone_path = tmp_path / "milestone.md"
+    milestone_path.write_text(
+        "\n".join(
+            [
+                "---",
+                'title: "Stage 1"',
+                "---",
+                "",
+                "Scope notes.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    milestone = load_milestone_document(milestone_path)
+
+    assert milestone.title == "Stage 1"
+    assert milestone.description == "Scope notes."
+
+
+def test_load_issue_document_requires_title(tmp_path) -> None:
+    issue_path = tmp_path / "issue.md"
+    issue_path.write_text("---\nlabels: [p1]\n---\n", encoding="utf-8")
+
+    with pytest.raises(DocumentError):
+        load_issue_document(issue_path)
+
+
+def test_update_front_matter_preserves_body(tmp_path) -> None:
+    issue_path = tmp_path / "issue.md"
+    issue_path.write_text(
+        "\n".join(
+            [
+                "---",
+                'title: "Ship it"',
+                "---",
+                "",
+                "Body text.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    update_front_matter(issue_path, {"number": 42})
+
+    issue = load_issue_document(issue_path)
+    assert issue.number == 42
+    assert "Body text." in issue.body
+
+
+def test_load_issue_document_parses_numeric_milestone(tmp_path) -> None:
+    issue_path = tmp_path / "issue.md"
+    issue_path.write_text(
+        "\n".join(
+            [
+                "---",
+                'title: "Ship it"',
+                "milestone: 7",
+                "---",
+                "",
+                "Body text.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    issue = load_issue_document(issue_path)
+
+    assert issue.milestone_number == 7
+    assert issue.milestone_set is True
+    assert issue.milestone is None
