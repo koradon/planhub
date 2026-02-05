@@ -149,7 +149,7 @@ class GitHubClient:
         issues: list[Mapping[str, Any]] = []
         page = 1
         while True:
-            path = f"/repos/{owner}/{repo}/issues" f"?state={state}&per_page=100&page={page}"
+            path = f"/repos/{owner}/{repo}/issues?state={state}&per_page=100&page={page}"
             data, headers = self._request_with_headers("GET", path)
             if not isinstance(data, list):
                 raise GitHubAPIError(
