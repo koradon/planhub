@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import typer
 
-from planhub.cli.commands import init_command, sync_command
+from planhub.cli.commands import init_command, issue_command, sync_command
 
 app = typer.Typer(help="Planhub CLI.")
 
@@ -28,6 +28,11 @@ def sync_entry(
     ),
 ) -> None:
     sync_command(dry_run=dry_run, import_existing=import_existing)
+
+
+@app.command("issue")
+def issue_entry(title: str = typer.Argument(..., help="Title of the issue to create.")) -> None:
+    issue_command(title=title)
 
 
 def main() -> None:

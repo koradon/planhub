@@ -35,6 +35,9 @@ uv pip install planhub
 - `planhub init`
   - Creates the standard `.plan/` structure in the current repo.
   - Use `--dry-run` to preview the folders that would be created.
+- `planhub issue <title>`
+  - Creates a new GitHub issue with the given title.
+  - Requires credentials and a GitHub `remote.origin.url`.
 - `planhub sync`
   - Reads `.plan/` files and creates or updates GitHub issues and milestones.
   - Writes the GitHub `number` back into each file after creation.
@@ -44,7 +47,7 @@ uv pip install planhub
     This requires credentials and a GitHub `remote.origin.url`.
   - Creating issues or milestones also requires credentials and a GitHub
     `remote.origin.url`.
-  - Sync never deletes local files. If something can’t be identified, it
+  - Sync never deletes local files. If something can't be identified, it
     reports an error and skips removal.
 
 ## Credentials
