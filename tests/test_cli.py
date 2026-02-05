@@ -100,6 +100,76 @@ def test_sync_rejects_state_reason_without_closed_state(tmp_path, monkeypatch) -
     assert "state_reason requires state='closed'" in result.output
 
 
+@patch("planhub.cli.commands.issue.datetime")
+@patch("planhub.cli.commands.issue.get_github_repo_from_git")
+@patch("planhub.cli.commands.issue.get_auth_token")
+@patch("planhub.cli.commands.issue.GitHubClient")
+def test_issue_command_success(
+    mock_client, mock_token, mock_repo, mock_datetime, tmp_path, monkeypatch
+) -> None:
+    mock_now = mock_datetime.now.return_value
+    mock_now.strftime.return_value = "20240115"
+    mock_token.return_value = "token"
+    mock_repo.return_value = ("acme", "roadmap")
+    mock_client.return_value.create_issue.return_value = {
+        "number": 42,
+        "html_url": "https://github.com/acme/roadmap/issues/42",
+        "state": "open",
+        "assignees": [],
+    }
+    monkeypatch.chdir(tmp_path)
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["issue", "Test Issue Title"])
+
+    assert result.exit_code == 0
+    assert "Created issue #42: Test Issue Title" in result.output
+    assert "View at: https://github.com/acme/roadmap/issues/42" in result.output
+    assert "Saved to:" in result.output
+    mock_client.return_value.create_issue.assert_called_once_with(
+        owner="acme", repo="roadmap", title="Test Issue Title"
+    )
+
+    # Verify the file was created in .plan/issues/
+    issue_files = list((tmp_path / ".plan" / "issues").glob("*.md"))
+    assert len(issue_files) == 1
+    issue_file = issue_files[0]
+    assert issue_file.name == "20240115-test-issue-title.md"
+
+    # Verify the file content
+    content = issue_file.read_text(encoding="utf-8")
+    assert "title: Test Issue Title" in content
+    assert "number: 42" in content
+    assert "state: open" in content
+    assert "assignees: []" in content
+
+
+def test_issue_command_no_token(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    with patch("planhub.cli.commands.issue.get_auth_token", return_value=None):
+        runner = CliRunner()
+        result = runner.invoke(app, ["issue", "Test Issue"])
+
+        assert result.exit_code == 1
+        assert "No GitHub token found" in result.output
+
+
+def test_issue_command_no_git_remote(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    with patch("planhub.cli.commands.issue.get_auth_token", return_value="token"):
+        with patch(
+            "planhub.cli.commands.issue.get_github_repo_from_git",
+            side_effect=ValueError("Missing git remote origin URL."),
+        ):
+            runner = CliRunner()
+            result = runner.invoke(app, ["issue", "Test Issue"])
+
+            assert result.exit_code == 1
+            assert "Missing git remote origin URL" in result.output
+
+
 def _create_milestone(
     directory: Path,
     milestone_title: str,
