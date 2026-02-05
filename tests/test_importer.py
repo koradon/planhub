@@ -25,8 +25,7 @@ def test_import_existing_creates_root_and_milestone_issues(tmp_path) -> None:
         {
             "number": 2,
             "title": "Milestone issue",
-            "state": "closed",
-            "state_reason": "completed",
+            "state": "open",
             "created_at": "2026-01-27T09:00:00Z",
             "milestone": {
                 "title": "Stage 1",
@@ -160,3 +159,61 @@ def test_import_moves_existing_issue_by_content(tmp_path) -> None:
     assert not issue_path.exists()
     assert moved_path.exists()
     assert load_issue_document(moved_path).number == 7
+
+
+def test_import_skips_closed_issues(tmp_path) -> None:
+    issues = [
+        {
+            "number": 5,
+            "title": "Closed issue",
+            "body": "This is closed",
+            "state": "closed",
+            "state_reason": "completed",
+            "created_at": "2026-01-27T10:00:00Z",
+            "labels": [],
+            "assignees": [],
+        }
+    ]
+    layout = ensure_layout(tmp_path)
+
+    result = import_existing_issues(
+        layout,
+        "acme",
+        "roadmap",
+        client=DummyClient(issues),
+        dry_run=False,
+    )
+
+    assert result.issues_created == 0
+    assert result.issues_skipped == 1
+    assert not (layout.issues_dir / "20260127-closed-issue.md").exists()
+
+
+def test_import_creates_reopened_issues(tmp_path) -> None:
+    issues = [
+        {
+            "number": 6,
+            "title": "Reopened issue",
+            "body": "This was closed but is now open",
+            "state": "open",
+            "state_reason": "reopened",
+            "created_at": "2026-01-27T10:00:00Z",
+            "labels": [],
+            "assignees": [],
+        }
+    ]
+    layout = ensure_layout(tmp_path)
+
+    result = import_existing_issues(
+        layout,
+        "acme",
+        "roadmap",
+        client=DummyClient(issues),
+        dry_run=False,
+    )
+
+    assert result.issues_created == 1
+    assert result.issues_skipped == 0
+    reopened_issue = load_issue_document(layout.issues_dir / "20260127-reopened-issue.md")
+    assert reopened_issue.title == "Reopened issue"
+    assert reopened_issue.number == 6

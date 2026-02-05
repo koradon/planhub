@@ -80,6 +80,13 @@ def import_existing_issues(
                     issues_skipped += 1
                 continue
 
+        # Only create files for open issues. Closed issues should not be created
+        # in the file system. If a closed issue is reopened, it will be imported.
+        issue_state = issue.get("state")
+        if issue_state != "open":
+            issues_skipped += 1
+            continue
+
         target_dir = milestone_dir[0] if milestone_dir else layout.issues_dir
         issue_path = _issue_path_for_import(target_dir, issue)
         if issue_path.exists():
