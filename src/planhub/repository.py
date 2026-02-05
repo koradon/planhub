@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
-from typing import Optional
 
 
 def get_github_repo_from_git(repo_root: Path) -> tuple[str, str]:
@@ -23,7 +22,7 @@ def get_github_repo_from_git(repo_root: Path) -> tuple[str, str]:
     return parsed
 
 
-def parse_github_remote(url: str) -> Optional[tuple[str, str]]:
+def parse_github_remote(url: str) -> tuple[str, str] | None:
     if url.startswith("git@github.com:"):
         path = url.replace("git@github.com:", "", 1)
     elif url.startswith("https://github.com/"):

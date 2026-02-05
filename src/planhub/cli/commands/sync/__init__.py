@@ -6,7 +6,7 @@ import typer
 
 from planhub.auth import get_auth_token
 from planhub.cli.sync_plan import apply_sync_plan, build_sync_plan
-from planhub.documents import DocumentError
+from planhub.documents import DocumentError  # noqa: F401
 from planhub.github import GitHubClient
 from planhub.importer import import_existing_issues
 from planhub.layout import PlanLayout, load_layout
@@ -19,7 +19,7 @@ def sync_command(*, dry_run: bool, import_existing: bool) -> None:
         layout = load_layout(repo_root)
     except FileNotFoundError as exc:
         typer.echo(f"{exc}. Run 'planhub init' first.")
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from exc
 
     client: GitHubClient | None = None
     owner_repo = _import_existing_issues_if_requested(
@@ -116,10 +116,7 @@ def _get_github_client(
 ) -> tuple[GitHubClient, str, str] | None:
     token = get_auth_token()
     if not token:
-        typer.echo(
-            "Missing GitHub credentials. "
-            "Set GITHUB_TOKEN/GH_TOKEN or run 'gh auth login'."
-        )
+        typer.echo("Missing GitHub credentials. Set GITHUB_TOKEN/GH_TOKEN or run 'gh auth login'.")
         return None
     try:
         owner, repo = get_github_repo_from_git(repo_root)

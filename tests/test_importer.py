@@ -50,20 +50,13 @@ def test_import_existing_creates_root_and_milestone_issues(tmp_path) -> None:
 
     assert result.issues_created == 2
     assert result.issues_moved == 0
-    root_issue = load_issue_document(
-        layout.issues_dir / "20260127-root-issue.md"
-    )
+    root_issue = load_issue_document(layout.issues_dir / "20260127-root-issue.md")
     assert root_issue.title == "Root issue"
     milestone_issue = load_issue_document(
-        layout.milestones_dir
-        / "stage-1"
-        / "issues"
-        / "20260127-milestone-issue.md"
+        layout.milestones_dir / "stage-1" / "issues" / "20260127-milestone-issue.md"
     )
     assert milestone_issue.milestone == "Stage 1"
-    milestone = load_milestone_document(
-        layout.milestones_dir / "stage-1" / "milestone.md"
-    )
+    milestone = load_milestone_document(layout.milestones_dir / "stage-1" / "milestone.md")
     assert milestone.title == "Stage 1"
 
 
@@ -108,7 +101,7 @@ def test_import_skips_existing_issue_number(tmp_path) -> None:
     layout = ensure_layout(tmp_path)
     layout.issues_dir.mkdir(parents=True, exist_ok=True)
     (layout.issues_dir / "issue.md").write_text(
-        "---\ntitle: \"Existing\"\nnumber: 4\n---\n\nBody\n",
+        '---\ntitle: "Existing"\nnumber: 4\n---\n\nBody\n',
         encoding="utf-8",
     )
 
@@ -148,7 +141,7 @@ def test_import_moves_existing_issue_by_content(tmp_path) -> None:
     layout.issues_dir.mkdir(parents=True, exist_ok=True)
     issue_path = layout.issues_dir / "issue.md"
     issue_path.write_text(
-        "---\ntitle: \"Doc update\"\n---\n\nSame body\n",
+        '---\ntitle: "Doc update"\n---\n\nSame body\n',
         encoding="utf-8",
     )
 

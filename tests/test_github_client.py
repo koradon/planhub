@@ -2,6 +2,7 @@ import json
 from unittest.mock import MagicMock, patch
 
 import pytest
+
 from planhub.github import (
     GitHubAPIError,
     GitHubClient,
@@ -29,9 +30,7 @@ def test_create_issue_builds_request() -> None:
     mock_session.request.return_value = _create_mock_response({"id": 123})
 
     client = GitHubClient(token="token-123", session=mock_session)
-    payload = client.create_issue(
-        "acme", "roadmap", "Ship it", body="Details", labels=["p1"]
-    )
+    payload = client.create_issue("acme", "roadmap", "Ship it", body="Details", labels=["p1"])
 
     assert payload["id"] == 123
     mock_session.request.assert_called_once()
@@ -86,9 +85,7 @@ def test_close_issue_uses_state_reason() -> None:
     mock_session.request.return_value = _create_mock_response({"state": "closed"})
 
     client = GitHubClient(token="token-123", session=mock_session)
-    payload = client.close_issue(
-        "acme", "roadmap", 42, state_reason=IssueStateReason.NOT_PLANNED
-    )
+    payload = client.close_issue("acme", "roadmap", 42, state_reason=IssueStateReason.NOT_PLANNED)
 
     assert payload["state"] == "closed"
     call_kwargs = mock_session.request.call_args.kwargs

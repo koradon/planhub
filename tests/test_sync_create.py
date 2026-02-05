@@ -23,14 +23,14 @@ def test_sync_creates_missing_issue_and_milestone(
     milestone_dir = layout.milestones_dir / "stage-1"
     milestone_dir.mkdir(parents=True, exist_ok=True)
     (milestone_dir / "milestone.md").write_text(
-        "---\ntitle: \"Stage 1\"\n---\n\nMilestone body\n",
+        '---\ntitle: "Stage 1"\n---\n\nMilestone body\n',
         encoding="utf-8",
     )
     issues_dir = milestone_dir / "issues"
     issues_dir.mkdir(parents=True, exist_ok=True)
     issue_path = issues_dir / "issue-001.md"
     issue_path.write_text(
-        "---\ntitle: \"Ship it\"\nstate: \"closed\"\n---\n\nIssue body\n",
+        '---\ntitle: "Ship it"\nstate: "closed"\n---\n\nIssue body\n',
         encoding="utf-8",
     )
 
@@ -59,7 +59,7 @@ def test_sync_updates_existing_issue(
     layout = ensure_layout(tmp_path)
     issue_path = layout.issues_dir / "issue.md"
     issue_path.write_text(
-        "---\ntitle: \"Ship it\"\nnumber: 99\nassignees: [alice]\n---\n\nBody\n",
+        '---\ntitle: "Ship it"\nnumber: 99\nassignees: [alice]\n---\n\nBody\n',
         encoding="utf-8",
     )
 

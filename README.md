@@ -85,6 +85,37 @@ export GITHUB_TOKEN=ghp_your_token_here
 - Use `labels: []` or `assignees: []` to remove them on GitHub.
 - `state_reason` requires `state: "closed"`.
 
+## Development
+
+### Setup
+
+Install development dependencies:
+
+```
+uv sync --dev
+```
+
+### Pre-commit Hooks
+
+This project uses pre-commit to run code quality checks before commits. Install
+the hooks:
+
+```
+uv run pre-commit install
+```
+
+The hooks will automatically run on `git commit`. They check for:
+- Code formatting and linting (ruff)
+- Trailing whitespace and end-of-file fixes
+- YAML, JSON, and TOML syntax
+- Merge conflicts and other common issues
+
+To run hooks manually:
+
+```
+uv run pre-commit run --all-files
+```
+
 ## Next Steps
 - Implement the parsing + GitHub sync logic.
 - Add CI to validate file formats.

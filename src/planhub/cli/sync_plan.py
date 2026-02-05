@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from threading import Lock
-from typing import Callable
 
 from planhub.documents import (
     DocumentError,
@@ -124,9 +124,7 @@ def _collect_root_issues(layout: PlanLayout, plan: SyncPlan, errors: list[str]) 
     return parsed
 
 
-def _validate_issue_state(
-    issue_doc: IssueDocument, issue_path: Path, errors: list[str]
-) -> bool:
+def _validate_issue_state(issue_doc: IssueDocument, issue_path: Path, errors: list[str]) -> bool:
     if issue_doc.state_reason and issue_doc.state != IssueState.CLOSED:
         errors.append(f"{issue_path}: state_reason requires state='closed'.")
         return True
@@ -172,9 +170,7 @@ def _update_existing_milestones(
 ) -> None:
     errors_lock = Lock()
 
-    def update_single_milestone(
-        milestone_path: Path, milestone_doc: MilestoneDocument
-    ) -> None:
+    def update_single_milestone(milestone_path: Path, milestone_doc: MilestoneDocument) -> None:
         if milestone_doc.number is None:
             with errors_lock:
                 errors.append(f"{milestone_path}: missing milestone number.")

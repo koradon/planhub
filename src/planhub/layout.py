@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
 
 PLAN_DIR_NAME = ".plan"
 MILESTONES_DIR_NAME = "milestones"
@@ -31,9 +31,7 @@ def ensure_layout(repo_root: Path) -> PlanLayout:
     issues_dir = plan_root / ROOT_ISSUES_DIR_NAME
     milestones_dir.mkdir(parents=True, exist_ok=True)
     issues_dir.mkdir(parents=True, exist_ok=True)
-    return PlanLayout(
-        root=plan_root, milestones_dir=milestones_dir, issues_dir=issues_dir
-    )
+    return PlanLayout(root=plan_root, milestones_dir=milestones_dir, issues_dir=issues_dir)
 
 
 def load_layout(repo_root: Path) -> PlanLayout:
@@ -46,9 +44,7 @@ def load_layout(repo_root: Path) -> PlanLayout:
         raise FileNotFoundError(f"Missing {MILESTONES_DIR_NAME} directory")
     if not issues_dir.exists():
         raise FileNotFoundError(f"Missing {ROOT_ISSUES_DIR_NAME} directory")
-    return PlanLayout(
-        root=plan_root, milestones_dir=milestones_dir, issues_dir=issues_dir
-    )
+    return PlanLayout(root=plan_root, milestones_dir=milestones_dir, issues_dir=issues_dir)
 
 
 def discover_milestones(layout: PlanLayout) -> tuple[MilestoneEntry, ...]:

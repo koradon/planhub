@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Mapping, Optional
+from typing import Any
 
 import yaml
 
@@ -20,29 +21,29 @@ class IssueDocument:
     path: Path
     title: str
     body: str
-    issue_id: Optional[str]
-    number: Optional[int]
+    issue_id: str | None
+    number: int | None
     labels: tuple[str, ...]
     labels_set: bool
-    milestone: Optional[str]
-    milestone_number: Optional[int]
+    milestone: str | None
+    milestone_number: int | None
     milestone_set: bool
     assignees: tuple[str, ...]
     assignees_set: bool
-    issue_type: Optional[str]
-    state: Optional[IssueState]
-    state_reason: Optional[IssueStateReason]
+    issue_type: str | None
+    state: IssueState | None
+    state_reason: IssueStateReason | None
 
 
 @dataclass(frozen=True)
 class MilestoneDocument:
     path: Path
     title: str
-    description: Optional[str]
-    due_on: Optional[str]
-    state: Optional[IssueState]
-    milestone_id: Optional[str]
-    number: Optional[int]
+    description: str | None
+    due_on: str | None
+    state: IssueState | None
+    milestone_id: str | None
+    number: int | None
     body: str
 
 
@@ -102,8 +103,8 @@ def update_front_matter(
     path: Path,
     updates: Mapping[str, Any],
     *,
-    cached_metadata: Optional[Mapping[str, Any]] = None,
-    cached_body: Optional[str] = None,
+    cached_metadata: Mapping[str, Any] | None = None,
+    cached_body: str | None = None,
 ) -> None:
     """Update front matter in a markdown file.
 
@@ -202,7 +203,7 @@ def _require_str(metadata: Mapping[str, Any], key: str, path: Path) -> str:
     return value
 
 
-def _optional_str(metadata: Mapping[str, Any], key: str, path: Path) -> Optional[str]:
+def _optional_str(metadata: Mapping[str, Any], key: str, path: Path) -> str | None:
     value = metadata.get(key)
     if value is None:
         return None
@@ -211,7 +212,7 @@ def _optional_str(metadata: Mapping[str, Any], key: str, path: Path) -> Optional
     return value
 
 
-def _optional_int(metadata: Mapping[str, Any], key: str, path: Path) -> Optional[int]:
+def _optional_int(metadata: Mapping[str, Any], key: str, path: Path) -> int | None:
     value = metadata.get(key)
     if value is None:
         return None
@@ -222,9 +223,7 @@ def _optional_int(metadata: Mapping[str, Any], key: str, path: Path) -> Optional
     raise DocumentError(path, f"Expected '{key}' to be an integer.")
 
 
-def _optional_str_list(
-    metadata: Mapping[str, Any], key: str, path: Path
-) -> tuple[str, ...]:
+def _optional_str_list(metadata: Mapping[str, Any], key: str, path: Path) -> tuple[str, ...]:
     value = metadata.get(key)
     if value is None:
         return ()
@@ -235,7 +234,7 @@ def _optional_str_list(
 
 def _optional_milestone(
     metadata: Mapping[str, Any], path: Path
-) -> tuple[Optional[str], Optional[int], bool]:
+) -> tuple[str | None, int | None, bool]:
     if "milestone" not in metadata:
         return None, None, False
     value = metadata.get("milestone")
@@ -252,7 +251,7 @@ def _has_key(metadata: Mapping[str, Any], key: str) -> bool:
     return key in metadata
 
 
-def _parse_issue_state(value: Any, path: Path) -> Optional[IssueState]:
+def _parse_issue_state(value: Any, path: Path) -> IssueState | None:
     if value is None:
         return None
     if not isinstance(value, str):
@@ -263,7 +262,7 @@ def _parse_issue_state(value: Any, path: Path) -> Optional[IssueState]:
         raise DocumentError(path, f"Unknown state '{value}'.") from exc
 
 
-def _parse_state_reason(value: Any, path: Path) -> Optional[IssueStateReason]:
+def _parse_state_reason(value: Any, path: Path) -> IssueStateReason | None:
     if value is None:
         return None
     if not isinstance(value, str):

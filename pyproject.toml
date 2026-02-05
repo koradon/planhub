@@ -39,10 +39,37 @@ planhub = "planhub.cli:main"
 [tool.hatch.build.targets.wheel]
 packages = ["src/planhub"]
 
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes (includes unused imports F401)
+    "I",   # isort (import sorting)
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+]
+ignore = []
+
+[tool.ruff.lint.isort]
+known-first-party = ["planhub"]
+combine-as-imports = true
+split-on-trailing-comma = true
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
 [dependency-groups]
 dev = [
     "pytest>=9.0.2",
     "pytest-cov>=7.0.0",
+    "pre-commit>=3.8.0",
+    "ruff>=0.8.4",
 ]
 publish = [
     "build>=1.4.0",
