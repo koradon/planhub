@@ -1,7 +1,7 @@
 from pathlib import Path
+from unittest.mock import patch
 
 from typer.testing import CliRunner
-from unittest.mock import patch
 
 from planhub.cli.app import app
 
@@ -86,9 +86,7 @@ def test_sync_dry_run_reports_counts(tmp_path, monkeypatch, capsys) -> None:
     assert "Found 1 milestones and 1 issues." in result.output
 
 
-def test_sync_rejects_state_reason_without_closed_state(
-    tmp_path, monkeypatch
-) -> None:
+def test_sync_rejects_state_reason_without_closed_state(tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     (tmp_path / ".plan" / "milestones").mkdir(parents=True, exist_ok=True)
     _create_root_issue(
@@ -109,28 +107,24 @@ def _create_milestone(
     issue_names: tuple[str, ...] = (),
 ) -> None:
     directory.mkdir(parents=True, exist_ok=True)
-    milestone_lines = ["---", f"title: \"{milestone_title}\""]
+    milestone_lines = ["---", f'title: "{milestone_title}"']
     if milestone_number is not None:
         milestone_lines.append(f"number: {milestone_number}")
     milestone_lines.append("---")
     milestone_lines.append("")
     milestone_lines.append("# Milestone")
-    (directory / "milestone.md").write_text(
-        "\n".join(milestone_lines), encoding="utf-8"
-    )
+    (directory / "milestone.md").write_text("\n".join(milestone_lines), encoding="utf-8")
     if issue_names:
         issues_dir = directory / "issues"
         issues_dir.mkdir(parents=True, exist_ok=True)
         for index, name in enumerate(issue_names, start=1):
             (issues_dir / name).write_text(
-                f"---\ntitle: \"Issue {index}\"\nnumber: {index}\n---\n\n# Issue\n",
+                f'---\ntitle: "Issue {index}"\nnumber: {index}\n---\n\n# Issue\n',
                 encoding="utf-8",
             )
 
 
-def _create_root_issue(
-    path: Path, number: int | None = None, state_reason: bool = False
-) -> None:
+def _create_root_issue(path: Path, number: int | None = None, state_reason: bool = False) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     lines = ["---", 'title: "Root Issue"']
     if number is not None:

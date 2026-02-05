@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Mapping, Optional
+from typing import Any
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -14,7 +15,7 @@ from urllib3.util.retry import Retry
 class GitHubAPIError(RuntimeError):
     status_code: int
     message: str
-    response_body: Optional[Mapping[str, Any]] = None
+    response_body: Mapping[str, Any] | None = None
 
     def __str__(self) -> str:
         return f"GitHub API error {self.status_code}: {self.message}"
@@ -56,7 +57,7 @@ class GitHubClient:
         self,
         token: str,
         base_url: str = "https://api.github.com",
-        session: Optional[requests.Session] = None,
+        session: requests.Session | None = None,
     ) -> None:
         self._token = token
         self._base_url = base_url.rstrip("/")
@@ -74,11 +75,11 @@ class GitHubClient:
         owner: str,
         repo: str,
         title: str,
-        body: Optional[str] = None,
-        labels: Optional[list[str]] = None,
-        assignees: Optional[list[str]] = None,
-        milestone: Optional[int] = None,
-        issue_type: Optional[str] = None,
+        body: str | None = None,
+        labels: list[str] | None = None,
+        assignees: list[str] | None = None,
+        milestone: int | None = None,
+        issue_type: str | None = None,
     ) -> Mapping[str, Any]:
         payload: dict[str, Any] = {"title": title}
         if body is not None:
@@ -101,8 +102,8 @@ class GitHubClient:
         owner: str,
         repo: str,
         number: int,
-        state: "IssueState",
-        state_reason: Optional["IssueStateReason"] = None,
+        state: IssueState,
+        state_reason: IssueStateReason | None = None,
     ) -> Mapping[str, Any]:
         payload: dict[str, Any] = {"state": state.value}
         if state_reason is not None:
@@ -115,15 +116,15 @@ class GitHubClient:
         repo: str,
         number: int,
         *,
-        title: Optional[str] = None,
-        body: Optional[str] = None,
-        labels: Optional[list[str]] = None,
-        assignees: Optional[list[str]] = None,
-        milestone: Optional[int] = None,
+        title: str | None = None,
+        body: str | None = None,
+        labels: list[str] | None = None,
+        assignees: list[str] | None = None,
+        milestone: int | None = None,
         clear_milestone: bool = False,
-        issue_type: Optional[str] = None,
-        state: Optional["IssueState"] = None,
-        state_reason: Optional["IssueStateReason"] = None,
+        issue_type: str | None = None,
+        state: IssueState | None = None,
+        state_reason: IssueStateReason | None = None,
     ) -> Mapping[str, Any]:
         payload: dict[str, Any] = {}
         if title is not None:
@@ -144,16 +145,11 @@ class GitHubClient:
             payload["state_reason"] = state_reason.value
         return self._request("PATCH", f"/repos/{owner}/{repo}/issues/{number}", payload)
 
-    def list_issues(
-        self, owner: str, repo: str, state: str = "open"
-    ) -> list[Mapping[str, Any]]:
+    def list_issues(self, owner: str, repo: str, state: str = "open") -> list[Mapping[str, Any]]:
         issues: list[Mapping[str, Any]] = []
         page = 1
         while True:
-            path = (
-                f"/repos/{owner}/{repo}/issues"
-                f"?state={state}&per_page=100&page={page}"
-            )
+            path = f"/repos/{owner}/{repo}/issues?state={state}&per_page=100&page={page}"
             data, headers = self._request_with_headers("GET", path)
             if not isinstance(data, list):
                 raise GitHubAPIError(
@@ -172,7 +168,7 @@ class GitHubClient:
         owner: str,
         repo: str,
         number: int,
-        state_reason: Optional["IssueStateReason"] = None,
+        state_reason: IssueStateReason | None = None,
     ) -> Mapping[str, Any]:
         return self.update_issue_state(
             owner, repo, number, IssueState.CLOSED, state_reason=state_reason
@@ -186,9 +182,9 @@ class GitHubClient:
         owner: str,
         repo: str,
         title: str,
-        description: Optional[str] = None,
-        due_on: Optional[str] = None,
-        state: Optional[str] = None,
+        description: str | None = None,
+        due_on: str | None = None,
+        state: str | None = None,
     ) -> Mapping[str, Any]:
         payload: dict[str, Any] = {"title": title}
         if description is not None:
@@ -205,10 +201,10 @@ class GitHubClient:
         repo: str,
         number: int,
         *,
-        title: Optional[str] = None,
-        description: Optional[str] = None,
-        due_on: Optional[str] = None,
-        state: Optional[str] = None,
+        title: str | None = None,
+        description: str | None = None,
+        due_on: str | None = None,
+        state: str | None = None,
     ) -> Mapping[str, Any]:
         payload: dict[str, Any] = {}
         if title is not None:
@@ -219,18 +215,14 @@ class GitHubClient:
             payload["due_on"] = due_on
         if state is not None:
             payload["state"] = state
-        return self._request(
-            "PATCH", f"/repos/{owner}/{repo}/milestones/{number}", payload
-        )
+        return self._request("PATCH", f"/repos/{owner}/{repo}/milestones/{number}", payload)
 
-    def _request(
-        self, method: str, path: str, payload: Optional[Mapping[str, Any]] = None
-    ) -> Any:
+    def _request(self, method: str, path: str, payload: Mapping[str, Any] | None = None) -> Any:
         data, _headers = self._request_with_headers(method, path, payload)
         return data
 
     def _request_with_headers(
-        self, method: str, path: str, payload: Optional[Mapping[str, Any]] = None
+        self, method: str, path: str, payload: Mapping[str, Any] | None = None
     ) -> tuple[Any, Mapping[str, str]]:
         url = f"{self._base_url}{path}"
         response = self._request_once(method, url, payload)
@@ -250,7 +242,7 @@ class GitHubClient:
         return self._parse_body(response.content), headers
 
     def _request_once(
-        self, method: str, url: str, payload: Optional[Mapping[str, Any]]
+        self, method: str, url: str, payload: Mapping[str, Any] | None
     ) -> requests.Response:
         return self._session.request(
             method=method,
@@ -259,7 +251,7 @@ class GitHubClient:
             timeout=30,
         )
 
-    def _handle_rate_limit(self, response: requests.Response) -> Optional[int]:
+    def _handle_rate_limit(self, response: requests.Response) -> int | None:
         """Return wait time in seconds when rate limited, otherwise None."""
         if response.status_code == 403:
             remaining = response.headers.get("X-RateLimit-Remaining")
@@ -285,10 +277,11 @@ class GitHubClient:
         if not raw_body:
             return {}
         import json
+
         return json.loads(raw_body.decode("utf-8"))
 
 
-def _has_next_link(link_header: Optional[str]) -> bool:
+def _has_next_link(link_header: str | None) -> bool:
     if not link_header:
         return False
     for part in link_header.split(","):

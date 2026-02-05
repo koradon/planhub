@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Mapping, Optional
+from typing import Any
 
 from planhub.documents import (
     DocumentError,
@@ -14,8 +15,7 @@ from planhub.documents import (
     render_markdown,
     update_front_matter,
 )
-from planhub.layout import discover_milestones, discover_root_issues
-from planhub.layout import PlanLayout
+from planhub.layout import PlanLayout, discover_milestones, discover_root_issues
 
 
 @dataclass(frozen=True)
@@ -57,17 +57,13 @@ def import_existing_issues(
         if milestone:
             milestone_title = milestone.get("title")
             if milestone_title:
-                milestone_dir = _ensure_milestone_dir(
-                    layout, milestone, dry_run=dry_run
-                )
+                milestone_dir = _ensure_milestone_dir(layout, milestone, dry_run=dry_run)
                 if milestone_dir and milestone_dir[1]:
                     milestones_created += 1
 
         if number in existing_issues:
             existing_path = existing_issues[number]
-            if _maybe_move_issue(
-                existing_path, milestone_dir, dry_run=dry_run
-            ):
+            if _maybe_move_issue(existing_path, milestone_dir, dry_run=dry_run):
                 issues_moved += 1
             else:
                 issues_skipped += 1
@@ -78,9 +74,7 @@ def import_existing_issues(
                 existing_path = existing_by_content[content_key]
                 if not dry_run:
                     update_front_matter(existing_path, {"number": number})
-                if _maybe_move_issue(
-                    existing_path, milestone_dir, dry_run=dry_run
-                ):
+                if _maybe_move_issue(existing_path, milestone_dir, dry_run=dry_run):
                     issues_moved += 1
                 else:
                     issues_skipped += 1
@@ -92,9 +86,7 @@ def import_existing_issues(
             issues_skipped += 1
             continue
 
-        issue_doc = _issue_document_from_api(
-            issue, issue_path, milestone_title=milestone_title
-        )
+        issue_doc = _issue_document_from_api(issue, issue_path, milestone_title=milestone_title)
         if not dry_run:
             _write_issue(issue_doc)
         issues_created += 1
@@ -109,7 +101,7 @@ def import_existing_issues(
 
 def _ensure_milestone_dir(
     layout: PlanLayout, milestone: Mapping[str, Any], *, dry_run: bool
-) -> Optional[tuple[Path, bool]]:
+) -> tuple[Path, bool] | None:
     title = milestone.get("title")
     if not title:
         return None
@@ -134,7 +126,7 @@ def _ensure_milestone_dir(
 
 def _maybe_move_issue(
     existing_path: Path,
-    milestone_dir: Optional[tuple[Path, bool]],
+    milestone_dir: tuple[Path, bool] | None,
     *,
     dry_run: bool,
 ) -> bool:
@@ -179,9 +171,7 @@ def _try_add_issue_number(issue_path: Path, numbers: dict[int, Path]) -> None:
         numbers.setdefault(issue_doc.number, issue_path)
 
 
-def _try_add_issue_content(
-    issue_path: Path, entries: dict[tuple[str, str], Path]
-) -> None:
+def _try_add_issue_content(issue_path: Path, entries: dict[tuple[str, str], Path]) -> None:
     try:
         issue_doc = load_issue_document(issue_path)
     except DocumentError:
@@ -192,12 +182,12 @@ def _try_add_issue_content(
     entries.setdefault(key, issue_path)
 
 
-def _content_key(title: str, body: Optional[str]) -> tuple[str, str]:
+def _content_key(title: str, body: str | None) -> tuple[str, str]:
     return title.strip(), (body or "").strip()
 
 
 def _issue_document_from_api(
-    issue: Mapping[str, Any], path: Path, *, milestone_title: Optional[str]
+    issue: Mapping[str, Any], path: Path, *, milestone_title: str | None
 ) -> IssueDocument:
     labels = tuple(label["name"] for label in issue.get("labels", []))
     assignees = tuple(assignee["login"] for assignee in issue.get("assignees", []))
@@ -222,9 +212,7 @@ def _issue_document_from_api(
     )
 
 
-def _milestone_document_from_api(
-    milestone: Mapping[str, Any], path: Path
-) -> MilestoneDocument:
+def _milestone_document_from_api(milestone: Mapping[str, Any], path: Path) -> MilestoneDocument:
     return MilestoneDocument(
         path=path,
         title=str(milestone.get("title", "")).strip(),
@@ -302,7 +290,7 @@ def _issue_path_for_import(directory: Path, issue: Mapping[str, Any]) -> Path:
         index += 1
 
 
-def _format_date(value: Optional[str]) -> str:
+def _format_date(value: str | None) -> str:
     if not value:
         return "00000000"
     try:
