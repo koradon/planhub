@@ -144,30 +144,87 @@ def test_issue_command_success(
     assert "assignees: []" in content
 
 
-def test_issue_command_no_token(tmp_path, monkeypatch) -> None:
+@patch("planhub.cli.commands.issue.get_auth_token", return_value=None)
+def test_issue_command_no_token(mock_token, tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
 
-    with patch("planhub.cli.commands.issue.get_auth_token", return_value=None):
-        runner = CliRunner()
-        result = runner.invoke(app, ["issue", "Test Issue"])
+    runner = CliRunner()
+    result = runner.invoke(app, ["issue", "Test Issue"])
 
-        assert result.exit_code == 1
-        assert "No GitHub token found" in result.output
+    assert result.exit_code == 1
+    assert "No GitHub token found" in result.output
 
 
-def test_issue_command_no_git_remote(tmp_path, monkeypatch) -> None:
+@patch("planhub.cli.commands.issue.get_github_repo_from_git")
+@patch("planhub.cli.commands.issue.get_auth_token", return_value="token")
+def test_issue_command_no_git_remote(mock_token, mock_repo, tmp_path, monkeypatch) -> None:
+    mock_repo.side_effect = ValueError("Missing git remote origin URL.")
     monkeypatch.chdir(tmp_path)
 
-    with patch("planhub.cli.commands.issue.get_auth_token", return_value="token"):
-        with patch(
-            "planhub.cli.commands.issue.get_github_repo_from_git",
-            side_effect=ValueError("Missing git remote origin URL."),
-        ):
-            runner = CliRunner()
-            result = runner.invoke(app, ["issue", "Test Issue"])
+    runner = CliRunner()
+    result = runner.invoke(app, ["issue", "Test Issue"])
 
-            assert result.exit_code == 1
-            assert "Missing git remote origin URL" in result.output
+    assert result.exit_code == 1
+    assert "Missing git remote origin URL" in result.output
+
+
+@patch("planhub.cli.commands.issue.datetime")
+@patch("planhub.cli.commands.issue.get_github_repo_from_git")
+@patch("planhub.cli.commands.issue.get_auth_token")
+@patch("planhub.cli.commands.issue.GitHubClient")
+def test_issue_command_handles_filename_conflicts(
+    mock_client, mock_token, mock_repo, mock_datetime, tmp_path, monkeypatch
+) -> None:
+    mock_now = mock_datetime.now.return_value
+    mock_now.strftime.return_value = "20240115"
+    mock_token.return_value = "token"
+    mock_repo.return_value = ("acme", "roadmap")
+
+    # First issue
+    mock_client.return_value.create_issue.side_effect = [
+        {
+            "number": 42,
+            "html_url": "https://github.com/acme/roadmap/issues/42",
+            "state": "open",
+            "assignees": [],
+        },
+        # Second issue with same title
+        {
+            "number": 43,
+            "html_url": "https://github.com/acme/roadmap/issues/43",
+            "state": "open",
+            "assignees": [],
+        },
+    ]
+    monkeypatch.chdir(tmp_path)
+
+    runner = CliRunner()
+
+    # Create first issue
+    result1 = runner.invoke(app, ["issue", "Test Issue"])
+    assert result1.exit_code == 0
+    assert "Created issue #42: Test Issue" in result1.output
+
+    # Create second issue with same title
+    result2 = runner.invoke(app, ["issue", "Test Issue"])
+    assert result2.exit_code == 0
+    assert "Created issue #43: Test Issue" in result2.output
+
+    # Verify both files exist with correct names
+    issue_files = sorted((tmp_path / ".plan" / "issues").glob("*.md"))
+    assert len(issue_files) == 2
+    assert issue_files[0].name == "20240115-test-issue-43.md"
+    assert issue_files[1].name == "20240115-test-issue.md"
+
+    # Verify first file content
+    content1 = issue_files[0].read_text(encoding="utf-8")
+    assert "title: Test Issue" in content1
+    assert "number: 43" in content1
+
+    # Verify second file content (with appended issue number)
+    content2 = issue_files[1].read_text(encoding="utf-8")
+    assert "title: Test Issue" in content2
+    assert "number: 42" in content2
 
 
 def _create_milestone(

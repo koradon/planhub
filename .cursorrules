@@ -16,9 +16,9 @@ Testing
 - Add or update tests when behavior changes.
 - If tests are requested, run `uv run pytest`.
 - Write function-style tests (avoid class-based suites).
-- Prefer the `patch` decorator when mocking.
+- Prefer the `@patch` decorator when mocking or patching.
 - Keep tests in the `/tests` directory at the project root.
-- Always run tests after making changes to the code.
+- Always run tests after making changes to the code or tests.
 
 Coverage
 - Use `coverage` via `pytest --cov` when coverage is requested.
