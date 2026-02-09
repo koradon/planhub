@@ -119,6 +119,25 @@ To run hooks manually:
 uv run pre-commit run --all-files
 ```
 
+### Version Bumping
+
+This project includes a `grow.py` script for bumping versions and creating releases:
+
+```
+./grow.py
+```
+
+The script will:
+1. Read the current version from `pyproject.toml`
+2. Show commits since the last tag
+3. Prompt for the new version
+4. Update the version in `pyproject.toml`
+5. Create a commit with a changelog of commits since the last release
+6. Create an annotated tag with the new version
+7. Optionally push commits and tags to the remote repository
+
+The changelog commit includes all commit messages since the last tag, making it easy to see what changed in each release on GitHub.
+
 ## Next Steps
 - Implement the parsing + GitHub sync logic.
 - Add CI to validate file formats.
