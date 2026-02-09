@@ -76,17 +76,34 @@ def update_version(new_version: str) -> None:
 
 
 def get_last_tag() -> str | None:
-    """Get the most recent git tag."""
+    """Get the latest semantic version tag (vX.Y.Z) by version, not history."""
+
     try:
+        # List all tags that look like semantic versions, e.g. v0.1.0
         result = subprocess.run(
-            ["git", "describe", "--tags", "--abbrev=0"],
+            ["git", "tag", "--list", "v[0-9]*.[0-9]*.[0-9]*"],
             capture_output=True,
             text=True,
             check=True,
         )
-        return result.stdout.strip()
     except subprocess.CalledProcessError:
         return None
+
+    tags = [t.strip() for t in result.stdout.split("\n") if t.strip()]
+    if not tags:
+        return None
+
+    def parse_tag(tag: str) -> tuple[int, int, int]:
+        m = re.match(r"^v(\d+)\.(\d+)\.(\d+)$", tag)
+        if not m:
+            # Put non-matching tags at the bottom
+            return (-1, -1, -1)
+        major, minor, patch = m.groups()
+        return int(major), int(minor), int(patch)
+
+    # Pick the highest semantic version
+    tags.sort(key=parse_tag)
+    return tags[-1]
 
 
 def get_commits_since_tag(tag: str | None) -> list[str]:
