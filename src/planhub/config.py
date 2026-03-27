@@ -32,6 +32,7 @@ class SyncGithubConfig:
 @dataclass(frozen=True)
 class SyncBehaviorConfig:
     dry_run: bool
+    verbosity: str  # "compact" | "verbose"
 
 
 @dataclass(frozen=True)
@@ -47,6 +48,7 @@ class PlanHubConfig:
 
 
 _CLOSED_ISSUES_POLICIES = {"archive", "delete"}
+_SYNC_VERBOSITY_LEVELS = {"compact", "verbose"}
 
 
 def _default_config_data() -> dict[str, Any]:
@@ -62,6 +64,7 @@ def _default_config_data() -> dict[str, Any]:
             },
             "behavior": {
                 "dry_run": False,
+                "verbosity": "compact",
             },
         }
     }
@@ -79,6 +82,7 @@ _CONFIG_SCHEMA: Mapping[str, Any] = {
         },
         "behavior": {
             "dry_run": ("bool", None),
+            "verbosity": ("enum", _SYNC_VERBOSITY_LEVELS),
         },
     }
 }
@@ -146,7 +150,10 @@ def load_config(repo_root: Path) -> PlanHubConfig:
                 default_assignees=tuple(sync_data["github"]["default_assignees"]),
                 default_labels=tuple(sync_data["github"]["default_labels"]),
             ),
-            behavior=SyncBehaviorConfig(dry_run=bool(sync_data["behavior"]["dry_run"])),
+            behavior=SyncBehaviorConfig(
+                dry_run=bool(sync_data["behavior"]["dry_run"]),
+                verbosity=str(sync_data["behavior"]["verbosity"]),
+            ),
         )
     )
 

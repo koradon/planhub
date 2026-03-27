@@ -3,6 +3,7 @@ from __future__ import annotations
 import shutil
 from collections.abc import Callable, Mapping
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
 from pathlib import Path
 from threading import Lock
 
@@ -33,6 +34,12 @@ class SyncPlan:
         self.issues_to_update: list[tuple[Path, IssueDocument, str | None]] = []
         self.milestone_numbers: dict[str, int] = {}
         self.milestone_titles_by_dir: dict[Path, str] = {}
+
+
+@dataclass(frozen=True)
+class ClosedIssueArchiveStats:
+    archived_count: int = 0
+    deleted_count: int = 0
 
 
 def _github_milestone_info_from_issue_payload(
@@ -537,7 +544,7 @@ def archive_closed_issues_in_filesystem(
     *,
     errors: list[str],
     dry_run: bool,
-) -> None:
+) -> ClosedIssueArchiveStats:
     """Archive or delete locally-synced GitHub-closed issues.
 
     We scan root issues (`.plan/issues`)
@@ -552,6 +559,8 @@ def archive_closed_issues_in_filesystem(
         return list(discover_root_issues(layout))
 
     issue_files = iter_issue_files()
+    archived_count = 0
+    deleted_count = 0
     for issue_path in issue_files:
         try:
             issue_doc = load_issue_document(issue_path)
@@ -565,6 +574,7 @@ def archive_closed_issues_in_filesystem(
             continue
 
         if policy == "delete":
+            deleted_count += 1
             if not dry_run:
                 try:
                     issue_path.unlink()
@@ -597,9 +607,11 @@ def archive_closed_issues_in_filesystem(
                 )
                 continue
 
+        archived_count += 1
         if not dry_run:
             target_path.parent.mkdir(parents=True, exist_ok=True)
             issue_path.rename(target_path)
+    return ClosedIssueArchiveStats(archived_count=archived_count, deleted_count=deleted_count)
 
 
 def reconcile_milestone_archive_locations(

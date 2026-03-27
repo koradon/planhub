@@ -31,8 +31,15 @@ uv venv
 uv pip install planhub
 ```
 
-After installing, run `planhub setup` once to create the global config at
-`~/.planhub/config.yaml` (it will be created only if missing).
+## First Run (Required)
+Run `planhub setup` immediately after installation to create the global config
+at `~/.planhub/config.yaml` (created only if missing):
+
+```
+planhub setup
+```
+
+Without this setup step, sync defaults and other CLI behavior may be missing.
 
 ## Commands
 - `planhub init`
@@ -48,12 +55,15 @@ After installing, run `planhub setup` once to create the global config at
   - Reads `.plan/` files and creates or updates GitHub issues and milestones.
   - Imports existing GitHub issues into `.plan/` when credentials and a GitHub
     `remote.origin.url` are available.
+  - Prints explicit operation counts for import/create/update/archive/delete.
   - Writes the GitHub `number` back into each file after creation.
   - GitHub is the source of truth for issue state during sync.
   - For existing issues, sync does not push local `state` or `state_reason` to
     GitHub; it reconciles those fields from the GitHub response.
   - Sync runs in three phases: parse files, build a sync plan, then apply it.
   - Use `--dry-run` to validate files without writing changes.
+  - Use `--verbose` for path-level planned changes, or `--compact` for concise
+    output. CLI flags override config.
   - Creating issues or milestones also requires credentials and a GitHub
     `remote.origin.url`.
   - Closed synced root issues are archived under `.plan/archive/issues` by
@@ -100,6 +110,10 @@ export GITHUB_TOKEN=ghp_your_token_here
 - `milestone` can be a title or a number; use `milestone: null` to clear it.
 - Use `labels: []` or `assignees: []` to remove them on GitHub.
 - `state_reason` requires `state: "closed"`.
+
+## Config
+- `~/.planhub/config.yaml` and `.plan/config.yaml` are layered (repo overrides global).
+- Set `sync.behavior.verbosity` to `compact` (default) or `verbose`.
 
 ## Development
 

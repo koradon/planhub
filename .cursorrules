@@ -14,6 +14,8 @@ Dependencies and tooling
 Testing
 - Use `pytest` for tests.
 - Add or update tests when behavior changes.
+- For non-trivial features or refactors, add comprehensive tests that cover all changed behavior paths (success, failure, edge cases), not just a representative case.
+- Do not rely on coverage percentages alone as proof of correctness; assert concrete behavior and user-visible outcomes.
 - If tests are requested, run `uv run pytest`.
 - Write function-style tests (avoid class-based suites).
 - Prefer the `@patch` decorator when mocking or patching.

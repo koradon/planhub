@@ -9,6 +9,7 @@ def test_load_config_uses_defaults(tmp_path) -> None:
     cfg = load_config(tmp_path)
     assert cfg.sync.closed_issues.policy == "archive"
     assert cfg.sync.closed_issues.archive_dir == tmp_path / ".plan" / "archive" / "issues"
+    assert cfg.sync.behavior.verbosity == "compact"
 
 
 def test_load_config_global_only(tmp_path) -> None:
@@ -154,3 +155,23 @@ def test_load_config_invalid_policy_fails(tmp_path) -> None:
         load_config(tmp_path)
 
     assert "closed_issues.policy" in str(exc.value)
+
+
+def test_load_config_invalid_verbosity_fails(tmp_path) -> None:
+    global_config_dir = tmp_path / ".planhub"
+    global_config_dir.mkdir(parents=True, exist_ok=True)
+    (global_config_dir / "config.yaml").write_text(
+        "\n".join(
+            [
+                "sync:",
+                "  behavior:",
+                "    verbosity: loud",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ConfigError) as exc:
+        load_config(tmp_path)
+
+    assert "sync.behavior.verbosity" in str(exc.value)
