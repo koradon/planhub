@@ -257,7 +257,8 @@ def test_sync_compact_flag_overrides_verbose_config(tmp_path, monkeypatch) -> No
     assert "[verbose] Planned changes" not in result.output
 
 
-def test_sync_rejects_conflicting_verbosity_flags(tmp_path, monkeypatch) -> None:
+@patch("planhub.cli.app.sync_command")
+def test_sync_rejects_conflicting_verbosity_flags(mock_sync_command, tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     _create_milestone(
         tmp_path / ".plan" / "milestones" / "stage-1",
@@ -267,11 +268,9 @@ def test_sync_rejects_conflicting_verbosity_flags(tmp_path, monkeypatch) -> None
     runner = CliRunner()
     result = runner.invoke(app, ["sync", "--verbose", "--compact"])
 
-    assert result.exit_code != 0
-    # Typer/Click error rendering differs across platforms and versions
-    # (e.g., Linux CI may wrap/format this as rich CLI usage output).
-    assert "--verbose" in result.output
-    assert "--compact" in result.output
+    # Assert behavior, not renderer-specific output text.
+    assert result.exit_code == 2
+    mock_sync_command.assert_not_called()
 
 
 @patch("planhub.cli.app.sync_command")
