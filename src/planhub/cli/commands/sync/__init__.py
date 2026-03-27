@@ -19,7 +19,7 @@ from planhub.layout import PlanLayout, load_layout
 from planhub.repository import get_github_repo_from_git
 
 
-def sync_command(*, dry_run: bool, import_existing: bool) -> None:
+def sync_command(*, dry_run: bool) -> None:
     repo_root = Path.cwd()
     try:
         layout = load_layout(repo_root)
@@ -42,14 +42,11 @@ def sync_command(*, dry_run: bool, import_existing: bool) -> None:
         raise typer.Exit(code=1)
 
     client: GitHubClient | None = None
-    owner_repo = _import_existing_issues_if_requested(
+    owner_repo = _import_existing_issues_if_possible(
         layout,
         repo_root,
         dry_run=dry_run,
-        import_existing=import_existing,
     )
-    if import_existing and owner_repo is None:
-        raise typer.Exit(code=1)
     if owner_repo is not None:
         client, owner_repo = owner_repo
 
@@ -103,15 +100,12 @@ def sync_command(*, dry_run: bool, import_existing: bool) -> None:
     typer.echo(f"Found {parsed_milestones} milestones and {parsed_issues} issues.")
 
 
-def _import_existing_issues_if_requested(
+def _import_existing_issues_if_possible(
     layout: PlanLayout,
     repo_root: Path,
     *,
     dry_run: bool,
-    import_existing: bool,
 ) -> tuple[GitHubClient, tuple[str, str]] | None:
-    if not import_existing:
-        return None
     auth = _get_github_client(repo_root)
     if auth is None:
         return None

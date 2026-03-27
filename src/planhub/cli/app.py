@@ -30,13 +30,8 @@ def sync_entry(
     dry_run: bool = typer.Option(
         False, "--dry-run", help="Show what would change without writing."
     ),
-    import_existing: bool = typer.Option(
-        False,
-        "--import-existing",
-        help="Import existing GitHub issues into .plan files.",
-    ),
 ) -> None:
-    sync_command(dry_run=dry_run, import_existing=import_existing)
+    sync_command(dry_run=dry_run)
 
 
 @app.command("issue")
