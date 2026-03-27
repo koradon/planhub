@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from collections.abc import Callable, Mapping
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -20,6 +19,7 @@ from planhub.documents import (
 )
 from planhub.github import GitHubClient, IssueState, IssueStateReason
 from planhub.layout import PlanLayout, discover_milestones, discover_root_issues
+from planhub.slug import slugify
 
 MAX_WORKERS = 5  # Conservative limit to avoid GitHub rate limits
 
@@ -32,19 +32,6 @@ class SyncPlan:
         self.issues_to_update: list[tuple[Path, IssueDocument, str | None]] = []
         self.milestone_numbers: dict[str, int] = {}
         self.milestone_titles_by_dir: dict[Path, str] = {}
-
-
-def _slugify(value: str) -> str:
-    """Convert a string to a stable folder slug."""
-    slug: list[str] = []
-    for char in value.lower():
-        if char.isalnum():
-            slug.append(char)
-        elif char in {" ", "-", "_"}:
-            slug.append("-")
-    normalized = "".join(slug).strip("-")
-    normalized = re.sub(r"-+", "-", normalized)
-    return normalized or "milestone"
 
 
 def _github_milestone_info_from_issue_payload(
@@ -445,7 +432,10 @@ def _update_existing_issues(
                 # GitHub indicates no milestone.
                 target_parent_dir = layout.issues_dir
             else:
-                milestone_slug = _slugify(milestone_title_github or str(milestone_number_github))
+                milestone_slug = slugify(
+                    milestone_title_github or str(milestone_number_github),
+                    fallback="milestone",
+                )
                 # Ensure local milestone structure exists so the rename/move succeeds.
                 if milestone_payload is not None:
                     with milestone_creation_lock:
