@@ -72,7 +72,7 @@ def sync_command(*, dry_run: bool, import_existing: bool) -> None:
                 raise typer.Exit(code=1)
             client, owner, repo = auth
             owner_repo = (owner, repo)
-        apply_sync_plan(client, owner_repo, plan, errors, config)
+        apply_sync_plan(client, owner_repo, plan, errors, config, layout)
 
     if not errors:
         archive_closed_issues_in_filesystem(layout, config, errors=errors, dry_run=dry_run)
