@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from threading import Lock
@@ -252,9 +252,10 @@ def _create_missing_issues(
         issue_number = created.get("number")
         if isinstance(issue_number, int):
             cached_metadata = issue_document_to_metadata(issue_doc)
+            state_updates = _state_updates_from_github_issue(created)
             update_front_matter(
                 issue_path,
-                {"number": issue_number},
+                {"number": issue_number, **state_updates},
                 cached_metadata=cached_metadata,
                 cached_body=issue_doc.body,
             )
@@ -262,14 +263,6 @@ def _create_missing_issues(
             with errors_lock:
                 errors.append(f"{issue_path}: GitHub did not return a number.")
             return
-        if issue_doc.state and issue_doc.state.value == "closed":
-            client.update_issue_state(
-                owner,
-                repo,
-                issue_number,
-                issue_doc.state,
-                state_reason=issue_doc.state_reason,
-            )
 
     _run_parallel(
         plan.issues_to_create,
@@ -305,6 +298,7 @@ def _update_existing_issues(
             return
         if (issue_doc.milestone or milestone_title) and milestone_number is None:
             return
+        github_issue = client.get_issue(owner, repo, issue_doc.number)
         labels = list(issue_doc.labels) if issue_doc.labels_set else None
         assignees = list(issue_doc.assignees) if issue_doc.assignees_set else None
         client.update_issue(
@@ -318,9 +312,19 @@ def _update_existing_issues(
             milestone=milestone_number,
             clear_milestone=clear_milestone,
             issue_type=issue_doc.issue_type,
-            state=issue_doc.state,
-            state_reason=issue_doc.state_reason,
+            # Keep issue state authoritative on GitHub during sync.
+            state=None,
+            state_reason=None,
         )
+        state_updates = _state_updates_from_github_issue(github_issue)
+        if state_updates:
+            cached_metadata = issue_document_to_metadata(issue_doc)
+            update_front_matter(
+                issue_path,
+                state_updates,
+                cached_metadata=cached_metadata,
+                cached_body=issue_doc.body,
+            )
 
     _run_parallel(
         plan.issues_to_update,
@@ -348,3 +352,20 @@ def _run_parallel(
             except Exception as exc:
                 with errors_lock:
                     errors.append(f"Parallel execution error: {exc}")
+
+
+def _state_updates_from_github_issue(
+    issue_payload: Mapping[str, object] | object,
+) -> dict[str, str | None]:
+    if not isinstance(issue_payload, Mapping):
+        return {}
+    raw_state = issue_payload.get("state")
+    if raw_state not in (IssueState.OPEN.value, IssueState.CLOSED.value):
+        return {}
+    updates: dict[str, str | None] = {"state": raw_state}
+    raw_reason = issue_payload.get("state_reason")
+    if isinstance(raw_reason, str) and raw_state == IssueState.CLOSED.value:
+        updates["state_reason"] = raw_reason
+    else:
+        updates["state_reason"] = None
+    return updates

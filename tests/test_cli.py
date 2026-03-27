@@ -48,6 +48,7 @@ def test_sync_reports_counts(
     mock_token.return_value = "token"
     mock_repo.return_value = ("acme", "roadmap")
     mock_client.return_value.update_issue.return_value = {}
+    mock_client.return_value.get_issue.return_value = {"state": "open"}
     mock_client.return_value.update_milestone.return_value = {}
     monkeypatch.chdir(tmp_path)
     _create_milestone(
