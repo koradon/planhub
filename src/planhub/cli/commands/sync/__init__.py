@@ -5,7 +5,12 @@ from pathlib import Path
 import typer
 
 from planhub.auth import get_auth_token
-from planhub.cli.sync_plan import apply_sync_plan, build_sync_plan
+from planhub.cli.sync_plan import (
+    apply_sync_plan,
+    archive_closed_issues_in_filesystem,
+    build_sync_plan,
+)
+from planhub.config import load_config
 from planhub.documents import DocumentError  # noqa: F401
 from planhub.github import GitHubClient
 from planhub.importer import import_existing_issues
@@ -20,6 +25,9 @@ def sync_command(*, dry_run: bool, import_existing: bool) -> None:
     except FileNotFoundError as exc:
         typer.echo(f"{exc}. Run 'planhub init' first.")
         raise typer.Exit(code=1) from exc
+
+    # Load layered config once per command invocation.
+    config = load_config(repo_root)
 
     client: GitHubClient | None = None
     owner_repo = _import_existing_issues_if_requested(
@@ -64,7 +72,10 @@ def sync_command(*, dry_run: bool, import_existing: bool) -> None:
                 raise typer.Exit(code=1)
             client, owner, repo = auth
             owner_repo = (owner, repo)
-        apply_sync_plan(client, owner_repo, plan, errors)
+        apply_sync_plan(client, owner_repo, plan, errors, config)
+
+    if not errors:
+        archive_closed_issues_in_filesystem(layout, config, errors=errors, dry_run=dry_run)
 
     if errors:
         for error in errors:

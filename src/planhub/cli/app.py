@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import typer
 
-from planhub.cli.commands import init_command, issue_command, sync_command
+from planhub.cli.commands import init_command, issue_command, setup_command, sync_command
 
 app = typer.Typer(help="Planhub CLI.")
 
@@ -14,6 +14,15 @@ def init_entry(
     ),
 ) -> None:
     init_command(dry_run=dry_run)
+
+
+@app.command("setup")
+def setup_entry(
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Show what would change without writing."
+    ),
+) -> None:
+    setup_command(dry_run=dry_run)
 
 
 @app.command("sync")

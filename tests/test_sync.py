@@ -75,7 +75,8 @@ def test_sync_updates_existing_issue(
     kwargs = client_instance.update_issue.call_args.kwargs
     assert kwargs["state"] is None
     assert kwargs["state_reason"] is None
-    issue = load_issue_document(issue_path)
+    archived_issue_path = tmp_path / ".plan" / "archive" / "issues" / issue_path.name
+    issue = load_issue_document(archived_issue_path)
     assert issue.state is not None
     assert issue.state.value == "closed"
     assert issue.state_reason is not None
@@ -105,7 +106,8 @@ def test_sync_ignores_unknown_state_reason_from_github(
     result = runner.invoke(app, ["sync"])
 
     assert result.exit_code == 0
-    issue = load_issue_document(issue_path)
+    archived_issue_path = tmp_path / ".plan" / "archive" / "issues" / issue_path.name
+    issue = load_issue_document(archived_issue_path)
     assert issue.state is not None
     assert issue.state.value == "closed"
     assert issue.state_reason is None
