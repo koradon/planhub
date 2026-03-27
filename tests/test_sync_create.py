@@ -85,6 +85,35 @@ def test_sync_updates_existing_issue(
 @patch("planhub.cli.commands.sync.get_github_repo_from_git")
 @patch("planhub.cli.commands.sync.get_auth_token")
 @patch("planhub.cli.commands.sync.GitHubClient")
+def test_sync_ignores_unknown_state_reason_from_github(
+    mock_client, mock_token, mock_repo, tmp_path, monkeypatch
+) -> None:
+    mock_token.return_value = "token"
+    mock_repo.return_value = ("acme", "roadmap")
+    client_instance = mock_client.return_value
+    client_instance.update_issue.return_value = {"state": "closed", "state_reason": "foo"}
+
+    layout = ensure_layout(tmp_path)
+    issue_path = layout.issues_dir / "issue.md"
+    issue_path.write_text(
+        '---\ntitle: "Ship it"\nnumber: 99\n---\n\nBody\n',
+        encoding="utf-8",
+    )
+
+    monkeypatch.chdir(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(app, ["sync"])
+
+    assert result.exit_code == 0
+    issue = load_issue_document(issue_path)
+    assert issue.state is not None
+    assert issue.state.value == "closed"
+    assert issue.state_reason is None
+
+
+@patch("planhub.cli.commands.sync.get_github_repo_from_git")
+@patch("planhub.cli.commands.sync.get_auth_token")
+@patch("planhub.cli.commands.sync.GitHubClient")
 def test_sync_clears_labels_assignees_and_milestone(
     mock_client, mock_token, mock_repo, tmp_path, monkeypatch
 ) -> None:

@@ -15,7 +15,7 @@ from planhub.documents import (
     milestone_document_to_metadata,
     update_front_matter,
 )
-from planhub.github import GitHubClient, IssueState
+from planhub.github import GitHubClient, IssueState, IssueStateReason
 from planhub.layout import PlanLayout, discover_milestones, discover_root_issues
 
 MAX_WORKERS = 5  # Conservative limit to avoid GitHub rate limits
@@ -363,8 +363,9 @@ def _state_updates_from_github_issue(
         return {}
     updates: dict[str, str | None] = {"state": raw_state}
     raw_reason = issue_payload.get("state_reason")
-    if isinstance(raw_reason, str) and raw_state == IssueState.CLOSED.value:
-        updates["state_reason"] = raw_reason
-    else:
-        updates["state_reason"] = None
+    if raw_state == IssueState.CLOSED.value and isinstance(raw_reason, str):
+        valid_reasons = {reason.value for reason in IssueStateReason}
+        updates["state_reason"] = raw_reason if raw_reason in valid_reasons else None
+        return updates
+    updates["state_reason"] = None
     return updates
