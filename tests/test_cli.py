@@ -1,9 +1,12 @@
+import importlib
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from typer.testing import CliRunner
 
 from planhub.cli.app import app
+
+cli_app_module = importlib.import_module("planhub.cli.app")
 
 
 def test_init_creates_layout(tmp_path, monkeypatch, capsys) -> None:
@@ -257,8 +260,9 @@ def test_sync_compact_flag_overrides_verbose_config(tmp_path, monkeypatch) -> No
     assert "[verbose] Planned changes" not in result.output
 
 
-@patch("planhub.cli.app.sync_command")
-def test_sync_rejects_conflicting_verbosity_flags(mock_sync_command, tmp_path, monkeypatch) -> None:
+def test_sync_rejects_conflicting_verbosity_flags(tmp_path, monkeypatch) -> None:
+    mock_sync_command = Mock()
+    monkeypatch.setattr(cli_app_module, "sync_command", mock_sync_command)
     monkeypatch.chdir(tmp_path)
     _create_milestone(
         tmp_path / ".plan" / "milestones" / "stage-1",
@@ -273,8 +277,9 @@ def test_sync_rejects_conflicting_verbosity_flags(mock_sync_command, tmp_path, m
     mock_sync_command.assert_not_called()
 
 
-@patch("planhub.cli.app.sync_command")
-def test_sync_cli_default_passes_no_verbosity_override(mock_sync_command) -> None:
+def test_sync_cli_default_passes_no_verbosity_override(monkeypatch) -> None:
+    mock_sync_command = Mock()
+    monkeypatch.setattr(cli_app_module, "sync_command", mock_sync_command)
     runner = CliRunner()
     result = runner.invoke(app, ["sync", "--dry-run"])
 
@@ -282,8 +287,9 @@ def test_sync_cli_default_passes_no_verbosity_override(mock_sync_command) -> Non
     mock_sync_command.assert_called_once_with(dry_run=True, verbosity_override=None)
 
 
-@patch("planhub.cli.app.sync_command")
-def test_sync_cli_verbose_passes_verbosity_override(mock_sync_command) -> None:
+def test_sync_cli_verbose_passes_verbosity_override(monkeypatch) -> None:
+    mock_sync_command = Mock()
+    monkeypatch.setattr(cli_app_module, "sync_command", mock_sync_command)
     runner = CliRunner()
     result = runner.invoke(app, ["sync", "--verbose"])
 
@@ -291,8 +297,9 @@ def test_sync_cli_verbose_passes_verbosity_override(mock_sync_command) -> None:
     mock_sync_command.assert_called_once_with(dry_run=False, verbosity_override="verbose")
 
 
-@patch("planhub.cli.app.sync_command")
-def test_sync_cli_compact_passes_verbosity_override(mock_sync_command) -> None:
+def test_sync_cli_compact_passes_verbosity_override(monkeypatch) -> None:
+    mock_sync_command = Mock()
+    monkeypatch.setattr(cli_app_module, "sync_command", mock_sync_command)
     runner = CliRunner()
     result = runner.invoke(app, ["sync", "--compact"])
 
