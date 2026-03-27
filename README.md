@@ -56,8 +56,12 @@ After installing, run `planhub setup` once to create the global config at
     This requires credentials and a GitHub `remote.origin.url`.
   - Creating issues or milestones also requires credentials and a GitHub
     `remote.origin.url`.
-  - Sync never deletes local files. If something can't be identified, it
-    reports an error and skips removal.
+  - Closed synced root issues are archived under `.plan/archive/issues` by
+    default (or deleted when `sync.closed_issues.policy: delete` is configured).
+  - Milestone issues remain inside their milestone folder. When
+    `milestone.md` has `state: "closed"`, sync moves the whole milestone
+    directory to `.plan/archive/milestones`. If set back to `state: "open"`,
+    sync moves that directory back under `.plan/milestones`.
 
 ## Credentials
 Planhub can reuse your GitHub CLI session or a token stored in the environment.

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 from collections.abc import Callable, Mapping
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -539,7 +540,7 @@ def archive_closed_issues_in_filesystem(
 ) -> None:
     """Archive or delete locally-synced GitHub-closed issues.
 
-    We scan the active plan layout (`.plan/issues` and `.plan/milestones/*/issues`)
+    We scan root issues (`.plan/issues`)
     and move/delete issue documents whose `state` is `closed` and which have
     a known GitHub `number` (i.e., they are already synced).
     """
@@ -548,11 +549,7 @@ def archive_closed_issues_in_filesystem(
     archive_dir = config.sync.closed_issues.archive_dir
 
     def iter_issue_files() -> list[Path]:
-        issue_files: list[Path] = []
-        issue_files.extend(discover_root_issues(layout))
-        for milestone_entry in discover_milestones(layout):
-            issue_files.extend(milestone_entry.issue_files)
-        return issue_files
+        return list(discover_root_issues(layout))
 
     issue_files = iter_issue_files()
     for issue_path in issue_files:
@@ -580,18 +577,7 @@ def archive_closed_issues_in_filesystem(
             errors.append(f"{issue_path}: Unsupported closed issue policy: {policy}.")
             continue
 
-        milestone_slug: str | None = None
-        try:
-            rel = issue_path.relative_to(layout.milestones_dir)
-            # Expected: <milestone-slug>/issues/<filename>.md
-            if len(rel.parts) >= 3 and rel.parts[1] == "issues":
-                milestone_slug = rel.parts[0]
-        except ValueError:
-            milestone_slug = None
-
         target_dir = archive_dir
-        if milestone_slug:
-            target_dir = archive_dir / milestone_slug
         target_path = target_dir / issue_path.name
 
         if target_path == issue_path:
@@ -614,3 +600,56 @@ def archive_closed_issues_in_filesystem(
         if not dry_run:
             target_path.parent.mkdir(parents=True, exist_ok=True)
             issue_path.rename(target_path)
+
+
+def reconcile_milestone_archive_locations(
+    layout: PlanLayout,
+    *,
+    errors: list[str],
+    dry_run: bool,
+    move_open_to_active: bool,
+    move_closed_to_archive: bool,
+) -> None:
+    """Move milestone directories between active and archive roots based on state."""
+    milestone_archive_root = layout.root / "archive" / "milestones"
+
+    def _iter_milestone_dirs(parent: Path) -> tuple[Path, ...]:
+        if not parent.exists():
+            return ()
+        return tuple(sorted(path for path in parent.iterdir() if path.is_dir()))
+
+    def _move_milestone_dir(source_dir: Path, target_root: Path) -> None:
+        target_dir = target_root / source_dir.name
+        if target_dir.exists():
+            errors.append(
+                f"{source_dir}: cannot move milestone directory because target already exists: "
+                f"{target_dir}."
+            )
+            return
+        if dry_run:
+            return
+        target_root.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(source_dir), str(target_dir))
+
+    if move_open_to_active:
+        for archived_dir in _iter_milestone_dirs(milestone_archive_root):
+            milestone_path = archived_dir / "milestone.md"
+            if not milestone_path.exists():
+                continue
+            try:
+                milestone_doc = load_milestone_document(milestone_path)
+            except DocumentError as exc:
+                errors.append(str(exc))
+                continue
+            if milestone_doc.state == IssueState.OPEN:
+                _move_milestone_dir(archived_dir, layout.milestones_dir)
+
+    if move_closed_to_archive:
+        for entry in discover_milestones(layout):
+            try:
+                milestone_doc = load_milestone_document(entry.milestone_file)
+            except DocumentError as exc:
+                errors.append(str(exc))
+                continue
+            if milestone_doc.state == IssueState.CLOSED:
+                _move_milestone_dir(entry.directory, milestone_archive_root)

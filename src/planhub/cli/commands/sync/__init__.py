@@ -9,6 +9,7 @@ from planhub.cli.sync_plan import (
     apply_sync_plan,
     archive_closed_issues_in_filesystem,
     build_sync_plan,
+    reconcile_milestone_archive_locations,
 )
 from planhub.config import load_config
 from planhub.documents import DocumentError  # noqa: F401
@@ -28,6 +29,17 @@ def sync_command(*, dry_run: bool, import_existing: bool) -> None:
 
     # Load layered config once per command invocation.
     config = load_config(repo_root)
+    errors: list[str] = []
+
+    reconcile_milestone_archive_locations(
+        layout,
+        errors=errors,
+        dry_run=dry_run,
+        move_open_to_active=True,
+        move_closed_to_archive=False,
+    )
+    if _report_parse_errors(errors):
+        raise typer.Exit(code=1)
 
     client: GitHubClient | None = None
     owner_repo = _import_existing_issues_if_requested(
@@ -76,6 +88,13 @@ def sync_command(*, dry_run: bool, import_existing: bool) -> None:
 
     if not errors:
         archive_closed_issues_in_filesystem(layout, config, errors=errors, dry_run=dry_run)
+        reconcile_milestone_archive_locations(
+            layout,
+            errors=errors,
+            dry_run=dry_run,
+            move_open_to_active=False,
+            move_closed_to_archive=True,
+        )
 
     if errors:
         for error in errors:
