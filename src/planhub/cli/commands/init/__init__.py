@@ -14,16 +14,24 @@ def init_command(*, dry_run: bool) -> None:
         plan_root = repo_root / ".plan"
         milestones_dir = plan_root / "milestones"
         issues_dir = plan_root / "issues"
-        typer.echo("Dry run: would create plan layout:")
+        typer.echo("🧪 [dry-run] Would prepare plan layout:")
         typer.echo(f"- {plan_root}")
         typer.echo(f"- {milestones_dir}")
         typer.echo(f"- {issues_dir}")
-        typer.echo("Dry run: would create config files (if missing):")
+        typer.echo("🧪 [dry-run] Would create config files (if missing):")
         typer.echo(f"- {_global_config_path()}")
         typer.echo(f"- {plan_root / 'config.yaml'}")
         return
 
     layout = ensure_layout(repo_root)
-    ensure_global_config()
-    ensure_repo_config(repo_root)
-    typer.echo(f"Initialized plan layout at {layout.root}")
+    global_created = ensure_global_config()
+    repo_created = ensure_repo_config(repo_root)
+    typer.echo(f"✅ Plan layout ready at {layout.root}")
+    typer.echo(
+        "⚙️ Global config:"
+        f" {'created' if global_created else 'already exists'} at {_global_config_path()}"
+    )
+    typer.echo(
+        "⚙️ Repository config:"
+        f" {'created' if repo_created else 'already exists'} at {layout.root / 'config.yaml'}"
+    )

@@ -21,6 +21,7 @@ def test_render_default_config_yaml_has_expected_structure() -> None:
     assert isinstance(data, dict)
     assert data["sync"]["closed_issues"]["policy"] == "archive"
     assert data["sync"]["closed_issues"]["archive_dir"] == ".plan/archive/issues"
+    assert data["sync"]["behavior"]["verbosity"] == "compact"
 
 
 def test_write_if_missing_creates_file_then_skips_overwrite(tmp_path) -> None:

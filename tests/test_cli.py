@@ -1,9 +1,12 @@
+import importlib
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from typer.testing import CliRunner
 
 from planhub.cli.app import app
+
+cli_app_module = importlib.import_module("planhub.cli.app")
 
 
 def test_init_creates_layout(tmp_path, monkeypatch, capsys) -> None:
@@ -17,7 +20,7 @@ def test_init_creates_layout(tmp_path, monkeypatch, capsys) -> None:
     assert (tmp_path / ".plan" / "issues").is_dir()
     assert (tmp_path / ".plan" / "config.yaml").is_file()
     assert (tmp_path / ".planhub" / "config.yaml").is_file()
-    assert "Initialized plan layout" in result.output
+    assert "Plan layout ready" in result.output
 
 
 def test_init_dry_run_does_not_create_layout(tmp_path, monkeypatch, capsys) -> None:
@@ -29,7 +32,7 @@ def test_init_dry_run_does_not_create_layout(tmp_path, monkeypatch, capsys) -> N
     assert result.exit_code == 0
     assert not (tmp_path / ".plan").exists()
     assert not (tmp_path / ".planhub" / "config.yaml").exists()
-    assert "Dry run" in result.output
+    assert "[dry-run]" in result.output
     assert str(tmp_path / ".planhub" / "config.yaml") in result.output
     assert str(tmp_path / ".plan" / "config.yaml") in result.output
 
@@ -52,7 +55,7 @@ def test_setup_dry_run_does_not_create_global_config(tmp_path, monkeypatch) -> N
 
     assert result.exit_code == 0
     assert not (tmp_path / ".planhub" / "config.yaml").exists()
-    assert "Dry run" in result.output
+    assert "[dry-run]" in result.output
 
 
 def test_setup_does_not_overwrite_existing_global_config(tmp_path, monkeypatch) -> None:
@@ -103,6 +106,7 @@ def test_sync_reports_counts(
     mock_repo.return_value = ("acme", "roadmap")
     mock_client.return_value.update_issue.return_value = {"state": "open"}
     mock_client.return_value.update_milestone.return_value = {}
+    mock_client.return_value.list_issues.return_value = []
     monkeypatch.chdir(tmp_path)
     _create_milestone(
         tmp_path / ".plan" / "milestones" / "stage-1",
@@ -110,6 +114,7 @@ def test_sync_reports_counts(
         milestone_number=1,
         issue_names=("issue-001.md",),
     )
+    (tmp_path / ".plan" / "issues").mkdir(parents=True, exist_ok=True)
     _create_milestone(
         tmp_path / ".plan" / "milestones" / "stage-2",
         milestone_title="Stage 2",
@@ -121,7 +126,55 @@ def test_sync_reports_counts(
     result = runner.invoke(app, ["sync"])
 
     assert result.exit_code == 0
-    assert "Found 2 milestones and 2 issues." in result.output
+    assert "Sync completed" in result.output
+    assert "Parsed: 2 milestones, 2 issues." in result.output
+
+
+@patch("planhub.cli.commands.sync.get_github_repo_from_git")
+@patch("planhub.cli.commands.sync.get_auth_token")
+@patch("planhub.cli.commands.sync.GitHubClient")
+def test_sync_counts_only_actual_modified_issue_files(
+    mock_client, mock_token, mock_repo, tmp_path, monkeypatch
+) -> None:
+    mock_token.return_value = "token"
+    mock_repo.return_value = ("acme", "roadmap")
+    client_instance = mock_client.return_value
+    client_instance.list_issues.return_value = []
+    client_instance.update_issue.return_value = {"state": "open"}
+    client_instance.update_milestone.return_value = {}
+
+    monkeypatch.chdir(tmp_path)
+    _create_milestone(
+        tmp_path / ".plan" / "milestones" / "stage-1",
+        milestone_title="Stage 1",
+        milestone_number=1,
+        issue_names=("issue-001.md",),
+    )
+    (tmp_path / ".plan" / "issues").mkdir(parents=True, exist_ok=True)
+    issue_path = tmp_path / ".plan" / "milestones" / "stage-1" / "issues" / "issue-001.md"
+    # Ensure local state already matches GitHub response so no file write occurs.
+    issue_path.write_text(
+        "\n".join(
+            [
+                "---",
+                'title: "Issue 1"',
+                "number: 1",
+                "state: open",
+                "state_reason: null",
+                "---",
+                "",
+                "# Issue",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["sync"])
+
+    assert result.exit_code == 0
+    assert "📝 Issues: create 0, update 0, delete 0, archive 0." in result.output
+    assert "🏁 Milestones: create 0, update 0." in result.output
 
 
 def test_sync_dry_run_reports_counts(tmp_path, monkeypatch, capsys) -> None:
@@ -136,8 +189,122 @@ def test_sync_dry_run_reports_counts(tmp_path, monkeypatch, capsys) -> None:
     result = runner.invoke(app, ["sync", "--dry-run"])
 
     assert result.exit_code == 0
-    assert "Dry run: no changes will be written." in result.output
-    assert "Found 1 milestones and 1 issues." in result.output
+    assert "[dry-run] No changes written." in result.output
+    assert "Parsed: 1 milestones, 1 issues." in result.output
+
+
+def test_sync_verbose_output_lists_planned_paths(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    _create_milestone(
+        tmp_path / ".plan" / "milestones" / "stage-1",
+        milestone_title="Stage 1",
+    )
+    _create_root_issue(tmp_path / ".plan" / "issues" / "issue-root.md")
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["sync", "--dry-run", "--verbose"])
+
+    assert result.exit_code == 0
+    assert "[verbose] Planned changes" in result.output
+    assert "milestone create:" in result.output
+    assert "issue create:" in result.output
+
+
+def test_sync_respects_verbose_from_repo_config(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    _create_milestone(
+        tmp_path / ".plan" / "milestones" / "stage-1",
+        milestone_title="Stage 1",
+    )
+    _create_root_issue(tmp_path / ".plan" / "issues" / "issue-root.md")
+    (tmp_path / ".plan" / "config.yaml").write_text(
+        "\n".join(
+            [
+                "sync:",
+                "  behavior:",
+                "    verbosity: verbose",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["sync", "--dry-run"])
+
+    assert result.exit_code == 0
+    assert "[verbose] Planned changes" in result.output
+
+
+def test_sync_compact_flag_overrides_verbose_config(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    _create_milestone(
+        tmp_path / ".plan" / "milestones" / "stage-1",
+        milestone_title="Stage 1",
+    )
+    _create_root_issue(tmp_path / ".plan" / "issues" / "issue-root.md")
+    (tmp_path / ".plan" / "config.yaml").write_text(
+        "\n".join(
+            [
+                "sync:",
+                "  behavior:",
+                "    verbosity: verbose",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["sync", "--dry-run", "--compact"])
+
+    assert result.exit_code == 0
+    assert "[verbose] Planned changes" not in result.output
+
+
+def test_sync_rejects_conflicting_verbosity_flags(tmp_path, monkeypatch) -> None:
+    mock_sync_command = Mock()
+    monkeypatch.setattr(cli_app_module, "sync_command", mock_sync_command)
+    monkeypatch.chdir(tmp_path)
+    _create_milestone(
+        tmp_path / ".plan" / "milestones" / "stage-1",
+        milestone_title="Stage 1",
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["sync", "--verbose", "--compact"])
+
+    # Assert behavior, not renderer-specific output text.
+    assert result.exit_code == 2
+    mock_sync_command.assert_not_called()
+
+
+def test_sync_cli_default_passes_no_verbosity_override(monkeypatch) -> None:
+    mock_sync_command = Mock()
+    monkeypatch.setattr(cli_app_module, "sync_command", mock_sync_command)
+    runner = CliRunner()
+    result = runner.invoke(app, ["sync", "--dry-run"])
+
+    assert result.exit_code == 0
+    mock_sync_command.assert_called_once_with(dry_run=True, verbosity_override=None)
+
+
+def test_sync_cli_verbose_passes_verbosity_override(monkeypatch) -> None:
+    mock_sync_command = Mock()
+    monkeypatch.setattr(cli_app_module, "sync_command", mock_sync_command)
+    runner = CliRunner()
+    result = runner.invoke(app, ["sync", "--verbose"])
+
+    assert result.exit_code == 0
+    mock_sync_command.assert_called_once_with(dry_run=False, verbosity_override="verbose")
+
+
+def test_sync_cli_compact_passes_verbosity_override(monkeypatch) -> None:
+    mock_sync_command = Mock()
+    monkeypatch.setattr(cli_app_module, "sync_command", mock_sync_command)
+    runner = CliRunner()
+    result = runner.invoke(app, ["sync", "--compact"])
+
+    assert result.exit_code == 0
+    mock_sync_command.assert_called_once_with(dry_run=False, verbosity_override="compact")
 
 
 def test_sync_rejects_state_reason_without_closed_state(tmp_path, monkeypatch) -> None:

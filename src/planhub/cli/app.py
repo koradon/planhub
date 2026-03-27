@@ -30,8 +30,17 @@ def sync_entry(
     dry_run: bool = typer.Option(
         False, "--dry-run", help="Show what would change without writing."
     ),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show detailed sync output."),
+    compact: bool = typer.Option(False, "--compact", help="Force compact sync output."),
 ) -> None:
-    sync_command(dry_run=dry_run)
+    verbosity_override: str | None = None
+    if verbose and compact:
+        raise typer.BadParameter("Use either --verbose or --compact, not both.")
+    if verbose:
+        verbosity_override = "verbose"
+    if compact:
+        verbosity_override = "compact"
+    sync_command(dry_run=dry_run, verbosity_override=verbosity_override)
 
 
 @app.command("issue")

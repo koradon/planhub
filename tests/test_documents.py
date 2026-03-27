@@ -87,11 +87,35 @@ def test_update_front_matter_preserves_body(tmp_path) -> None:
         encoding="utf-8",
     )
 
-    update_front_matter(issue_path, {"number": 42})
+    changed = update_front_matter(issue_path, {"number": 42})
 
     issue = load_issue_document(issue_path)
+    assert changed is True
     assert issue.number == 42
     assert "Body text." in issue.body
+
+
+def test_update_front_matter_returns_false_for_noop_update(tmp_path) -> None:
+    issue_path = tmp_path / "issue.md"
+    issue_path.write_text(
+        "\n".join(
+            [
+                "---",
+                'title: "Ship it"',
+                "number: 42",
+                "---",
+                "",
+                "Body text.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    original = issue_path.read_text(encoding="utf-8")
+    changed = update_front_matter(issue_path, {"number": 42})
+
+    assert changed is False
+    assert issue_path.read_text(encoding="utf-8") == original
 
 
 def test_load_issue_document_parses_numeric_milestone(tmp_path) -> None:
