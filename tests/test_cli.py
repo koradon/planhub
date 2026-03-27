@@ -15,6 +15,8 @@ def test_init_creates_layout(tmp_path, monkeypatch, capsys) -> None:
     assert result.exit_code == 0
     assert (tmp_path / ".plan" / "milestones").is_dir()
     assert (tmp_path / ".plan" / "issues").is_dir()
+    assert (tmp_path / ".plan" / "config.yaml").is_file()
+    assert (tmp_path / ".planhub" / "config.yaml").is_file()
     assert "Initialized plan layout" in result.output
 
 
@@ -26,7 +28,59 @@ def test_init_dry_run_does_not_create_layout(tmp_path, monkeypatch, capsys) -> N
 
     assert result.exit_code == 0
     assert not (tmp_path / ".plan").exists()
+    assert not (tmp_path / ".planhub" / "config.yaml").exists()
     assert "Dry run" in result.output
+    assert str(tmp_path / ".planhub" / "config.yaml") in result.output
+    assert str(tmp_path / ".plan" / "config.yaml") in result.output
+
+
+def test_setup_creates_global_config(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["setup"])
+
+    assert result.exit_code == 0
+    assert (tmp_path / ".planhub" / "config.yaml").is_file()
+
+
+def test_setup_dry_run_does_not_create_global_config(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["setup", "--dry-run"])
+
+    assert result.exit_code == 0
+    assert not (tmp_path / ".planhub" / "config.yaml").exists()
+    assert "Dry run" in result.output
+
+
+def test_setup_does_not_overwrite_existing_global_config(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    global_config_path = tmp_path / ".planhub" / "config.yaml"
+    global_config_path.parent.mkdir(parents=True, exist_ok=True)
+    global_config_path.write_text("sync: { }", encoding="utf-8")
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["setup"])
+
+    assert result.exit_code == 0
+    assert global_config_path.read_text(encoding="utf-8") == "sync: { }"
+
+
+def test_init_does_not_overwrite_existing_repo_config(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    repo_plan_config_path = tmp_path / ".plan" / "config.yaml"
+    repo_plan_config_path.parent.mkdir(parents=True, exist_ok=True)
+    repo_plan_config_path.write_text("sync: { custom: true }", encoding="utf-8")
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["init"])
+
+    assert result.exit_code == 0
+    assert repo_plan_config_path.read_text(encoding="utf-8") == "sync: { custom: true }"
 
 
 def test_sync_requires_layout(tmp_path, monkeypatch, capsys) -> None:

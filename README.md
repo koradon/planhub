@@ -31,10 +31,16 @@ uv venv
 uv pip install planhub
 ```
 
+After installing, run `planhub setup` once to create the global config at
+`~/.planhub/config.yaml` (it will be created only if missing).
+
 ## Commands
 - `planhub init`
   - Creates the standard `.plan/` structure in the current repo.
   - Use `--dry-run` to preview the folders that would be created.
+- `planhub setup`
+  - Creates the global config file at `~/.planhub/config.yaml` (if missing).
+  - Use `--dry-run` to preview what would be created.
 - `planhub issue <title>`
   - Creates a new GitHub issue with the given title.
   - Requires credentials and a GitHub `remote.origin.url`.

@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from threading import Lock
 
+from planhub.config import PlanHubConfig
 from planhub.documents import (
     DocumentError,
     IssueDocument,
@@ -65,6 +66,7 @@ def apply_sync_plan(
     owner_repo: tuple[str, str] | None,
     plan: SyncPlan,
     errors: list[str],
+    config: PlanHubConfig,
 ) -> None:
     if owner_repo is None:
         errors.append("Missing repository information for sync.")
@@ -72,8 +74,8 @@ def apply_sync_plan(
     owner, repo = owner_repo
     _create_missing_milestones(client, owner, repo, plan, errors)
     _update_existing_milestones(client, owner, repo, plan, errors)
-    _create_missing_issues(client, owner, repo, plan, errors)
-    _update_existing_issues(client, owner, repo, plan, errors)
+    _create_missing_issues(client, owner, repo, plan, errors, config)
+    _update_existing_issues(client, owner, repo, plan, errors, config)
 
 
 def _collect_issues_for_entry(entry, plan: SyncPlan, errors: list[str]) -> int:
@@ -219,6 +221,7 @@ def _create_missing_issues(
     repo: str,
     plan: SyncPlan,
     errors: list[str],
+    config: PlanHubConfig,
 ) -> None:
     errors_lock = Lock()
 
@@ -237,8 +240,16 @@ def _create_missing_issues(
             milestone_number = None
         if (issue_doc.milestone or milestone_title) and milestone_number is None:
             return
-        labels = list(issue_doc.labels) if issue_doc.labels_set else None
-        assignees = list(issue_doc.assignees) if issue_doc.assignees_set else None
+        labels = (
+            list(issue_doc.labels)
+            if issue_doc.labels_set
+            else list(config.sync.github.default_labels)
+        )
+        assignees = (
+            list(issue_doc.assignees)
+            if issue_doc.assignees_set
+            else list(config.sync.github.default_assignees)
+        )
         created = client.create_issue(
             owner,
             repo,
@@ -278,6 +289,7 @@ def _update_existing_issues(
     repo: str,
     plan: SyncPlan,
     errors: list[str],
+    config: PlanHubConfig,
 ) -> None:
     errors_lock = Lock()
 
@@ -298,8 +310,16 @@ def _update_existing_issues(
             return
         if (issue_doc.milestone or milestone_title) and milestone_number is None:
             return
-        labels = list(issue_doc.labels) if issue_doc.labels_set else None
-        assignees = list(issue_doc.assignees) if issue_doc.assignees_set else None
+        labels = (
+            list(issue_doc.labels)
+            if issue_doc.labels_set
+            else list(config.sync.github.default_labels)
+        )
+        assignees = (
+            list(issue_doc.assignees)
+            if issue_doc.assignees_set
+            else list(config.sync.github.default_assignees)
+        )
         updated_issue = client.update_issue(
             owner,
             repo,
@@ -369,3 +389,89 @@ def _state_updates_from_github_issue(
         return updates
     updates["state_reason"] = None
     return updates
+
+
+def archive_closed_issues_in_filesystem(
+    layout: PlanLayout,
+    config: PlanHubConfig,
+    *,
+    errors: list[str],
+    dry_run: bool,
+) -> None:
+    """Archive or delete locally-synced GitHub-closed issues.
+
+    We scan the active plan layout (`.plan/issues` and `.plan/milestones/*/issues`)
+    and move/delete issue documents whose `state` is `closed` and which have
+    a known GitHub `number` (i.e., they are already synced).
+    """
+
+    policy = config.sync.closed_issues.policy
+    archive_dir = config.sync.closed_issues.archive_dir
+
+    def iter_issue_files() -> list[Path]:
+        issue_files: list[Path] = []
+        issue_files.extend(discover_root_issues(layout))
+        for milestone_entry in discover_milestones(layout):
+            issue_files.extend(milestone_entry.issue_files)
+        return issue_files
+
+    issue_files = iter_issue_files()
+    for issue_path in issue_files:
+        try:
+            issue_doc = load_issue_document(issue_path)
+        except DocumentError as exc:
+            errors.append(str(exc))
+            continue
+
+        if issue_doc.number is None:
+            continue
+        if issue_doc.state != IssueState.CLOSED:
+            continue
+
+        if policy == "delete":
+            if not dry_run:
+                try:
+                    issue_path.unlink()
+                except FileNotFoundError:
+                    # Best-effort cleanup.
+                    pass
+            continue
+
+        if policy != "archive":
+            errors.append(f"{issue_path}: Unsupported closed issue policy: {policy}.")
+            continue
+
+        milestone_slug: str | None = None
+        try:
+            rel = issue_path.relative_to(layout.milestones_dir)
+            # Expected: <milestone-slug>/issues/<filename>.md
+            if len(rel.parts) >= 3 and rel.parts[1] == "issues":
+                milestone_slug = rel.parts[0]
+        except ValueError:
+            milestone_slug = None
+
+        target_dir = archive_dir
+        if milestone_slug:
+            target_dir = archive_dir / milestone_slug
+        target_path = target_dir / issue_path.name
+
+        if target_path == issue_path:
+            continue
+
+        if target_path.exists():
+            # Avoid overwriting; add numeric suffix.
+            for index in range(1, 1000):
+                candidate = target_path.with_name(f"{target_path.stem}-{index}{target_path.suffix}")
+                if not candidate.exists():
+                    target_path = candidate
+                    break
+            else:
+                errors.append(
+                    f"{issue_path}: archive target collision; all suffixes 1..999 are taken for "
+                    f"{target_path}."
+                )
+                continue
+
+        if not dry_run:
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+            issue_path.rename(target_path)

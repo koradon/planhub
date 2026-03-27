@@ -75,7 +75,8 @@ def test_sync_updates_existing_issue(
     kwargs = client_instance.update_issue.call_args.kwargs
     assert kwargs["state"] is None
     assert kwargs["state_reason"] is None
-    issue = load_issue_document(issue_path)
+    archived_issue_path = tmp_path / ".plan" / "archive" / "issues" / issue_path.name
+    issue = load_issue_document(archived_issue_path)
     assert issue.state is not None
     assert issue.state.value == "closed"
     assert issue.state_reason is not None
@@ -105,7 +106,8 @@ def test_sync_ignores_unknown_state_reason_from_github(
     result = runner.invoke(app, ["sync"])
 
     assert result.exit_code == 0
-    issue = load_issue_document(issue_path)
+    archived_issue_path = tmp_path / ".plan" / "archive" / "issues" / issue_path.name
+    issue = load_issue_document(archived_issue_path)
     assert issue.state is not None
     assert issue.state.value == "closed"
     assert issue.state_reason is None
@@ -187,3 +189,81 @@ def test_sync_uses_numeric_milestone(
     assert result.exit_code == 0
     kwargs = client_instance.update_issue.call_args.kwargs
     assert kwargs["milestone"] == 7
+
+
+@patch("planhub.cli.commands.sync.get_github_repo_from_git")
+@patch("planhub.cli.commands.sync.get_auth_token")
+@patch("planhub.cli.commands.sync.GitHubClient")
+def test_sync_create_uses_config_defaults_for_unset_labels_and_assignees(
+    mock_client, mock_token, mock_repo, tmp_path, monkeypatch
+) -> None:
+    mock_token.return_value = "token"
+    mock_repo.return_value = ("acme", "roadmap")
+    client_instance = mock_client.return_value
+    client_instance.create_issue.return_value = {"number": 21, "state": "open"}
+
+    (tmp_path / ".plan").mkdir(parents=True, exist_ok=True)
+    (tmp_path / ".plan" / "config.yaml").write_text(
+        "\n".join(
+            [
+                "sync:",
+                "  github:",
+                "    default_labels: [bug, backend]",
+                "    default_assignees: [alice, bob]",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    layout = ensure_layout(tmp_path)
+    issue_path = layout.issues_dir / "issue-001.md"
+    issue_path.write_text('---\ntitle: "Ship it"\n---\n\nIssue body\n', encoding="utf-8")
+
+    monkeypatch.chdir(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(app, ["sync"])
+
+    assert result.exit_code == 0
+    kwargs = client_instance.create_issue.call_args.kwargs
+    assert kwargs["labels"] == ["bug", "backend"]
+    assert kwargs["assignees"] == ["alice", "bob"]
+
+
+@patch("planhub.cli.commands.sync.get_github_repo_from_git")
+@patch("planhub.cli.commands.sync.get_auth_token")
+@patch("planhub.cli.commands.sync.GitHubClient")
+def test_sync_update_uses_config_defaults_for_unset_labels_and_assignees(
+    mock_client, mock_token, mock_repo, tmp_path, monkeypatch
+) -> None:
+    mock_token.return_value = "token"
+    mock_repo.return_value = ("acme", "roadmap")
+    client_instance = mock_client.return_value
+    client_instance.update_issue.return_value = {"state": "open"}
+
+    (tmp_path / ".plan").mkdir(parents=True, exist_ok=True)
+    (tmp_path / ".plan" / "config.yaml").write_text(
+        "\n".join(
+            [
+                "sync:",
+                "  github:",
+                "    default_labels: [bug, backend]",
+                "    default_assignees: [alice, bob]",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    layout = ensure_layout(tmp_path)
+    issue_path = layout.issues_dir / "issue-001.md"
+    issue_path.write_text(
+        '---\ntitle: "Ship it"\nnumber: 99\n---\n\nIssue body\n', encoding="utf-8"
+    )
+
+    monkeypatch.chdir(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(app, ["sync"])
+
+    assert result.exit_code == 0
+    kwargs = client_instance.update_issue.call_args.kwargs
+    assert kwargs["labels"] == ["bug", "backend"]
+    assert kwargs["assignees"] == ["alice", "bob"]
