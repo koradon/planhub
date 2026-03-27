@@ -890,3 +890,51 @@ def test_sync_does_not_relocate_when_github_milestone_field_missing(
     assert result.exit_code == 0
     assert issue_path.exists()
     assert not (layout.issues_dir / issue_path.name).exists()
+
+
+@patch("planhub.cli.commands.sync.get_github_repo_from_git")
+@patch("planhub.cli.commands.sync.get_auth_token")
+@patch("planhub.cli.commands.sync.GitHubClient")
+def test_sync_parallel_moves_same_filename_to_root_are_collision_safe(
+    mock_client, mock_token, mock_repo, tmp_path, monkeypatch
+) -> None:
+    mock_token.return_value = "token"
+    mock_repo.return_value = ("acme", "roadmap")
+    client_instance = mock_client.return_value
+    client_instance.update_issue.return_value = {
+        "state": "open",
+        "milestone": None,
+    }
+
+    layout = ensure_layout(tmp_path)
+    for milestone_slug, number in [("stage-1", 7), ("stage-2", 8)]:
+        milestone_dir = layout.milestones_dir / milestone_slug
+        milestone_dir.mkdir(parents=True, exist_ok=True)
+        (milestone_dir / "milestone.md").write_text(
+            f'---\ntitle: "{milestone_slug}"\nnumber: {number}\n---\n',
+            encoding="utf-8",
+        )
+        issues_dir = milestone_dir / "issues"
+        issues_dir.mkdir(parents=True, exist_ok=True)
+        (issues_dir / "issue.md").write_text(
+            "\n".join(
+                [
+                    "---",
+                    f'title: "{milestone_slug} issue"',
+                    f"number: {number}",
+                    f"milestone: {number}",
+                    "---",
+                    "",
+                    "Body",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+    monkeypatch.chdir(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(app, ["sync"])
+
+    assert result.exit_code == 0
+    assert (layout.issues_dir / "issue.md").exists()
+    assert (layout.issues_dir / "issue-1.md").exists()

@@ -385,6 +385,16 @@ def _update_existing_issues(
 ) -> None:
     errors_lock = Lock()
     milestone_creation_lock = Lock()
+    move_locks_by_dir: dict[Path, Lock] = {}
+    move_locks_registry_lock = Lock()
+
+    def _move_lock_for_dir(target_dir: Path) -> Lock:
+        with move_locks_registry_lock:
+            lock = move_locks_by_dir.get(target_dir)
+            if lock is None:
+                lock = Lock()
+                move_locks_by_dir[target_dir] = lock
+            return lock
 
     def update_single_issue(
         issue_path: Path, issue_doc: IssueDocument, milestone_title: str | None
@@ -450,7 +460,9 @@ def _update_existing_issues(
                     target_parent_dir.mkdir(parents=True, exist_ok=True)
 
             if issue_path.parent != target_parent_dir:
-                issue_path = _move_issue_to_dir(issue_path, target_dir=target_parent_dir)
+                # Serialize moves per target directory to avoid rename races.
+                with _move_lock_for_dir(target_parent_dir):
+                    issue_path = _move_issue_to_dir(issue_path, target_dir=target_parent_dir)
 
             if milestone_title_github is not None or milestone_number_github is not None:
                 if milestone_number_github is not None:
