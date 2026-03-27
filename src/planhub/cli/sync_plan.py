@@ -42,6 +42,14 @@ class ClosedIssueArchiveStats:
     deleted_count: int = 0
 
 
+@dataclass(frozen=True)
+class SyncExecutionStats:
+    issues_created: int = 0
+    issues_updated: int = 0
+    milestones_created: int = 0
+    milestones_updated: int = 0
+
+
 def _github_milestone_info_from_issue_payload(
     issue_payload: Mapping[str, object] | object,
 ) -> tuple[bool, Mapping[str, object] | None, str | None, int | None]:
@@ -166,15 +174,21 @@ def apply_sync_plan(
     errors: list[str],
     config: PlanHubConfig,
     layout: PlanLayout,
-) -> None:
+) -> SyncExecutionStats:
     if owner_repo is None:
         errors.append("Missing repository information for sync.")
-        return
+        return SyncExecutionStats()
     owner, repo = owner_repo
-    _create_missing_milestones(client, owner, repo, plan, errors)
-    _update_existing_milestones(client, owner, repo, plan, errors)
-    _create_missing_issues(client, owner, repo, plan, errors, config)
-    _update_existing_issues(client, layout, owner, repo, plan, errors, config)
+    milestones_created = _create_missing_milestones(client, owner, repo, plan, errors)
+    milestones_updated = _update_existing_milestones(client, owner, repo, plan, errors)
+    issues_created = _create_missing_issues(client, owner, repo, plan, errors, config)
+    issues_updated = _update_existing_issues(client, layout, owner, repo, plan, errors, config)
+    return SyncExecutionStats(
+        issues_created=issues_created,
+        issues_updated=issues_updated,
+        milestones_created=milestones_created,
+        milestones_updated=milestones_updated,
+    )
 
 
 def _collect_issues_for_entry(entry, plan: SyncPlan, errors: list[str]) -> int:
@@ -238,7 +252,8 @@ def _create_missing_milestones(
     repo: str,
     plan: SyncPlan,
     errors: list[str],
-) -> None:
+) -> int:
+    modified_count = 0
     for milestone_path, milestone_doc in plan.milestones_to_create:
         created = client.create_milestone(
             owner,
@@ -251,15 +266,17 @@ def _create_missing_milestones(
         number = created.get("number")
         if isinstance(number, int):
             cached_metadata = milestone_document_to_metadata(milestone_doc)
-            update_front_matter(
+            if update_front_matter(
                 milestone_path,
                 {"number": number},
                 cached_metadata=cached_metadata,
                 cached_body=milestone_doc.body,
-            )
+            ):
+                modified_count += 1
             plan.milestone_numbers[milestone_doc.title] = number
         else:
             errors.append(f"{milestone_path}: GitHub did not return a number.")
+    return modified_count
 
 
 def _update_existing_milestones(
@@ -268,7 +285,7 @@ def _update_existing_milestones(
     repo: str,
     plan: SyncPlan,
     errors: list[str],
-) -> None:
+) -> int:
     errors_lock = Lock()
 
     def update_single_milestone(milestone_path: Path, milestone_doc: MilestoneDocument) -> None:
@@ -292,6 +309,9 @@ def _update_existing_milestones(
         errors,
         errors_lock,
     )
+    # Existing milestone sync currently updates GitHub only and does not mutate
+    # local milestone files.
+    return 0
 
 
 def _resolve_milestone_number(
@@ -321,12 +341,15 @@ def _create_missing_issues(
     plan: SyncPlan,
     errors: list[str],
     config: PlanHubConfig,
-) -> None:
+) -> int:
     errors_lock = Lock()
+    modified_count = 0
+    modified_count_lock = Lock()
 
     def create_single_issue(
         issue_path: Path, issue_doc: IssueDocument, milestone_title: str | None
     ) -> None:
+        nonlocal modified_count
         local_errors: list[str] = []
         milestone_number, clear_milestone = _resolve_milestone_number(
             plan, issue_path, issue_doc, milestone_title, local_errors
@@ -363,12 +386,15 @@ def _create_missing_issues(
         if isinstance(issue_number, int):
             cached_metadata = issue_document_to_metadata(issue_doc)
             state_updates = _state_updates_from_github_issue(created)
-            update_front_matter(
+            changed = update_front_matter(
                 issue_path,
                 {"number": issue_number, **state_updates},
                 cached_metadata=cached_metadata,
                 cached_body=issue_doc.body,
             )
+            if changed:
+                with modified_count_lock:
+                    modified_count += 1
         else:
             with errors_lock:
                 errors.append(f"{issue_path}: GitHub did not return a number.")
@@ -380,6 +406,7 @@ def _create_missing_issues(
         errors,
         errors_lock,
     )
+    return modified_count
 
 
 def _update_existing_issues(
@@ -390,11 +417,13 @@ def _update_existing_issues(
     plan: SyncPlan,
     errors: list[str],
     config: PlanHubConfig,
-) -> None:
+) -> int:
     errors_lock = Lock()
     milestone_creation_lock = Lock()
     move_locks_by_dir: dict[Path, Lock] = {}
     move_locks_registry_lock = Lock()
+    modified_count = 0
+    modified_count_lock = Lock()
 
     def _move_lock_for_dir(target_dir: Path) -> Lock:
         with move_locks_registry_lock:
@@ -407,6 +436,7 @@ def _update_existing_issues(
     def update_single_issue(
         issue_path: Path, issue_doc: IssueDocument, milestone_title: str | None
     ) -> None:
+        nonlocal modified_count
         del milestone_title  # Milestone placement is reconciled from GitHub.
         if issue_doc.number is None:
             with errors_lock:
@@ -422,6 +452,7 @@ def _update_existing_issues(
             if issue_doc.assignees_set
             else list(config.sync.github.default_assignees)
         )
+        local_modified = False
         updated_issue = client.update_issue(
             owner,
             repo,
@@ -471,6 +502,7 @@ def _update_existing_issues(
                 # Serialize moves per target directory to avoid rename races.
                 with _move_lock_for_dir(target_parent_dir):
                     issue_path = _move_issue_to_dir(issue_path, target_dir=target_parent_dir)
+                local_modified = True
 
             if milestone_title_github is not None or milestone_number_github is not None:
                 if milestone_number_github is not None:
@@ -484,13 +516,15 @@ def _update_existing_issues(
         updates.update(state_updates)
         updates.update(milestone_updates)
         if updates:
-            cached_metadata = issue_document_to_metadata(issue_doc)
-            update_front_matter(
+            changed = update_front_matter(
                 issue_path,
                 updates,
-                cached_metadata=cached_metadata,
-                cached_body=issue_doc.body,
             )
+            local_modified = local_modified or changed
+
+        if local_modified:
+            with modified_count_lock:
+                modified_count += 1
 
     _run_parallel(
         plan.issues_to_update,
@@ -498,6 +532,7 @@ def _update_existing_issues(
         errors,
         errors_lock,
     )
+    return modified_count
 
 
 def _run_parallel(

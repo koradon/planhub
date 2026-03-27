@@ -105,7 +105,7 @@ def update_front_matter(
     *,
     cached_metadata: Mapping[str, Any] | None = None,
     cached_body: str | None = None,
-) -> None:
+) -> bool:
     """Update front matter in a markdown file.
 
     Args:
@@ -121,7 +121,10 @@ def update_front_matter(
         metadata, body = _parse_front_matter(path, path.read_text(encoding="utf-8"))
     merged = dict(metadata)
     merged.update(updates)
+    if merged == metadata:
+        return False
     path.write_text(render_markdown(merged, body), encoding="utf-8")
+    return True
 
 
 def render_markdown(front_matter: Mapping[str, Any], body: str) -> str:

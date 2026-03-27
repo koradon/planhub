@@ -107,7 +107,32 @@ def sync_command(*, dry_run: bool, verbosity_override: str | None = None) -> Non
                 raise typer.Exit(code=1)
             client, owner, repo = auth
             owner_repo = (owner, repo)
-        apply_sync_plan(client, owner_repo, plan, errors, config, layout)
+        apply_stats = apply_sync_plan(client, owner_repo, plan, errors, config, layout)
+        stats = SyncOutputStats(
+            imported_created=stats.imported_created,
+            imported_moved=stats.imported_moved,
+            imported_skipped=stats.imported_skipped,
+            imported_milestones_created=stats.imported_milestones_created,
+            plan_milestones_create=apply_stats.milestones_created,
+            plan_milestones_update=apply_stats.milestones_updated,
+            plan_issues_create=apply_stats.issues_created,
+            plan_issues_update=apply_stats.issues_updated,
+            archived_issues=stats.archived_issues,
+            deleted_issues=stats.deleted_issues,
+        )
+    else:
+        stats = SyncOutputStats(
+            imported_created=stats.imported_created,
+            imported_moved=stats.imported_moved,
+            imported_skipped=stats.imported_skipped,
+            imported_milestones_created=stats.imported_milestones_created,
+            plan_milestones_create=0,
+            plan_milestones_update=0,
+            plan_issues_create=0,
+            plan_issues_update=0,
+            archived_issues=stats.archived_issues,
+            deleted_issues=stats.deleted_issues,
+        )
 
     if not errors:
         archive_stats = archive_closed_issues_in_filesystem(

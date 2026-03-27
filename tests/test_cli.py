@@ -103,6 +103,7 @@ def test_sync_reports_counts(
     mock_repo.return_value = ("acme", "roadmap")
     mock_client.return_value.update_issue.return_value = {"state": "open"}
     mock_client.return_value.update_milestone.return_value = {}
+    mock_client.return_value.list_issues.return_value = []
     monkeypatch.chdir(tmp_path)
     _create_milestone(
         tmp_path / ".plan" / "milestones" / "stage-1",
@@ -110,6 +111,7 @@ def test_sync_reports_counts(
         milestone_number=1,
         issue_names=("issue-001.md",),
     )
+    (tmp_path / ".plan" / "issues").mkdir(parents=True, exist_ok=True)
     _create_milestone(
         tmp_path / ".plan" / "milestones" / "stage-2",
         milestone_title="Stage 2",
@@ -123,6 +125,53 @@ def test_sync_reports_counts(
     assert result.exit_code == 0
     assert "Sync completed" in result.output
     assert "Parsed: 2 milestones, 2 issues." in result.output
+
+
+@patch("planhub.cli.commands.sync.get_github_repo_from_git")
+@patch("planhub.cli.commands.sync.get_auth_token")
+@patch("planhub.cli.commands.sync.GitHubClient")
+def test_sync_counts_only_actual_modified_issue_files(
+    mock_client, mock_token, mock_repo, tmp_path, monkeypatch
+) -> None:
+    mock_token.return_value = "token"
+    mock_repo.return_value = ("acme", "roadmap")
+    client_instance = mock_client.return_value
+    client_instance.list_issues.return_value = []
+    client_instance.update_issue.return_value = {"state": "open"}
+    client_instance.update_milestone.return_value = {}
+
+    monkeypatch.chdir(tmp_path)
+    _create_milestone(
+        tmp_path / ".plan" / "milestones" / "stage-1",
+        milestone_title="Stage 1",
+        milestone_number=1,
+        issue_names=("issue-001.md",),
+    )
+    (tmp_path / ".plan" / "issues").mkdir(parents=True, exist_ok=True)
+    issue_path = tmp_path / ".plan" / "milestones" / "stage-1" / "issues" / "issue-001.md"
+    # Ensure local state already matches GitHub response so no file write occurs.
+    issue_path.write_text(
+        "\n".join(
+            [
+                "---",
+                'title: "Issue 1"',
+                "number: 1",
+                "state: open",
+                "state_reason: null",
+                "---",
+                "",
+                "# Issue",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["sync"])
+
+    assert result.exit_code == 0
+    assert "📝 Issues: create 0, update 0, delete 0, archive 0." in result.output
+    assert "🏁 Milestones: create 0, update 0." in result.output
 
 
 def test_sync_dry_run_reports_counts(tmp_path, monkeypatch, capsys) -> None:
