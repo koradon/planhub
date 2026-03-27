@@ -11,7 +11,7 @@ test: ## Run tests
 	uv run pytest
 
 test-cov: ## Run tests with coverage report
-	uv run pytest --cov=planhub --cov-report=html --cov-report=term
+	uv run pytest --cov=planhub --cov-report=html --cov-report=term-missing
 
 lint: ## Run linting checks
 	uv run ruff check .

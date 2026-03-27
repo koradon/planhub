@@ -298,10 +298,9 @@ def _update_existing_issues(
             return
         if (issue_doc.milestone or milestone_title) and milestone_number is None:
             return
-        github_issue = client.get_issue(owner, repo, issue_doc.number)
         labels = list(issue_doc.labels) if issue_doc.labels_set else None
         assignees = list(issue_doc.assignees) if issue_doc.assignees_set else None
-        client.update_issue(
+        updated_issue = client.update_issue(
             owner,
             repo,
             issue_doc.number,
@@ -316,7 +315,7 @@ def _update_existing_issues(
             state=None,
             state_reason=None,
         )
-        state_updates = _state_updates_from_github_issue(github_issue)
+        state_updates = _state_updates_from_github_issue(updated_issue)
         if state_updates:
             cached_metadata = issue_document_to_metadata(issue_doc)
             update_front_matter(

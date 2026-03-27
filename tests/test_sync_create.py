@@ -57,7 +57,7 @@ def test_sync_updates_existing_issue(
     mock_token.return_value = "token"
     mock_repo.return_value = ("acme", "roadmap")
     client_instance = mock_client.return_value
-    client_instance.get_issue.return_value = {"state": "closed", "state_reason": "completed"}
+    client_instance.update_issue.return_value = {"state": "closed", "state_reason": "completed"}
 
     layout = ensure_layout(tmp_path)
     issue_path = layout.issues_dir / "issue.md"
@@ -91,7 +91,7 @@ def test_sync_clears_labels_assignees_and_milestone(
     mock_token.return_value = "token"
     mock_repo.return_value = ("acme", "roadmap")
     client_instance = mock_client.return_value
-    client_instance.get_issue.return_value = {"state": "open"}
+    client_instance.update_issue.return_value = {"state": "open"}
 
     layout = ensure_layout(tmp_path)
     issue_path = layout.issues_dir / "issue.md"
@@ -132,7 +132,7 @@ def test_sync_uses_numeric_milestone(
     mock_token.return_value = "token"
     mock_repo.return_value = ("acme", "roadmap")
     client_instance = mock_client.return_value
-    client_instance.get_issue.return_value = {"state": "open"}
+    client_instance.update_issue.return_value = {"state": "open"}
 
     layout = ensure_layout(tmp_path)
     issue_path = layout.issues_dir / "issue.md"
