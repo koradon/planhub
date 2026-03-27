@@ -46,14 +46,14 @@ After installing, run `planhub setup` once to create the global config at
   - Requires credentials and a GitHub `remote.origin.url`.
 - `planhub sync`
   - Reads `.plan/` files and creates or updates GitHub issues and milestones.
+  - Imports existing GitHub issues into `.plan/` when credentials and a GitHub
+    `remote.origin.url` are available.
   - Writes the GitHub `number` back into each file after creation.
   - GitHub is the source of truth for issue state during sync.
   - For existing issues, sync does not push local `state` or `state_reason` to
     GitHub; it reconciles those fields from the GitHub response.
   - Sync runs in three phases: parse files, build a sync plan, then apply it.
   - Use `--dry-run` to validate files without writing changes.
-  - Use `--import-existing` to pull existing GitHub issues into `.plan/`.
-    This requires credentials and a GitHub `remote.origin.url`.
   - Creating issues or milestones also requires credentials and a GitHub
     `remote.origin.url`.
   - Closed synced root issues are archived under `.plan/archive/issues` by
