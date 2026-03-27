@@ -74,8 +74,8 @@ def apply_sync_plan(
     owner, repo = owner_repo
     _create_missing_milestones(client, owner, repo, plan, errors)
     _update_existing_milestones(client, owner, repo, plan, errors)
-    _create_missing_issues(client, owner, repo, plan, errors)
-    _update_existing_issues(client, owner, repo, plan, errors)
+    _create_missing_issues(client, owner, repo, plan, errors, config)
+    _update_existing_issues(client, owner, repo, plan, errors, config)
 
 
 def _collect_issues_for_entry(entry, plan: SyncPlan, errors: list[str]) -> int:
@@ -221,6 +221,7 @@ def _create_missing_issues(
     repo: str,
     plan: SyncPlan,
     errors: list[str],
+    config: PlanHubConfig,
 ) -> None:
     errors_lock = Lock()
 
@@ -239,8 +240,16 @@ def _create_missing_issues(
             milestone_number = None
         if (issue_doc.milestone or milestone_title) and milestone_number is None:
             return
-        labels = list(issue_doc.labels) if issue_doc.labels_set else None
-        assignees = list(issue_doc.assignees) if issue_doc.assignees_set else None
+        labels = (
+            list(issue_doc.labels)
+            if issue_doc.labels_set
+            else list(config.sync.github.default_labels)
+        )
+        assignees = (
+            list(issue_doc.assignees)
+            if issue_doc.assignees_set
+            else list(config.sync.github.default_assignees)
+        )
         created = client.create_issue(
             owner,
             repo,
@@ -280,6 +289,7 @@ def _update_existing_issues(
     repo: str,
     plan: SyncPlan,
     errors: list[str],
+    config: PlanHubConfig,
 ) -> None:
     errors_lock = Lock()
 
@@ -300,8 +310,16 @@ def _update_existing_issues(
             return
         if (issue_doc.milestone or milestone_title) and milestone_number is None:
             return
-        labels = list(issue_doc.labels) if issue_doc.labels_set else None
-        assignees = list(issue_doc.assignees) if issue_doc.assignees_set else None
+        labels = (
+            list(issue_doc.labels)
+            if issue_doc.labels_set
+            else list(config.sync.github.default_labels)
+        )
+        assignees = (
+            list(issue_doc.assignees)
+            if issue_doc.assignees_set
+            else list(config.sync.github.default_assignees)
+        )
         updated_issue = client.update_issue(
             owner,
             repo,
