@@ -17,7 +17,7 @@ def test_sync_creates_missing_issue_and_milestone(
     mock_repo.return_value = ("acme", "roadmap")
     client_instance = mock_client.return_value
     client_instance.create_milestone.return_value = {"number": 7}
-    client_instance.create_issue.return_value = {"number": 21}
+    client_instance.create_issue.return_value = {"number": 21, "state": "open"}
 
     layout = ensure_layout(tmp_path)
     milestone_dir = layout.milestones_dir / "stage-1"
@@ -43,7 +43,9 @@ def test_sync_creates_missing_issue_and_milestone(
     issue = load_issue_document(issue_path)
     assert milestone.number == 7
     assert issue.number == 21
-    client_instance.update_issue_state.assert_called_once()
+    assert issue.state is not None
+    assert issue.state.value == "open"
+    client_instance.update_issue_state.assert_not_called()
 
 
 @patch("planhub.cli.commands.sync.get_github_repo_from_git")
@@ -55,6 +57,7 @@ def test_sync_updates_existing_issue(
     mock_token.return_value = "token"
     mock_repo.return_value = ("acme", "roadmap")
     client_instance = mock_client.return_value
+    client_instance.update_issue.return_value = {"state": "closed", "state_reason": "completed"}
 
     layout = ensure_layout(tmp_path)
     issue_path = layout.issues_dir / "issue.md"
@@ -69,6 +72,43 @@ def test_sync_updates_existing_issue(
 
     assert result.exit_code == 0
     client_instance.update_issue.assert_called_once()
+    kwargs = client_instance.update_issue.call_args.kwargs
+    assert kwargs["state"] is None
+    assert kwargs["state_reason"] is None
+    issue = load_issue_document(issue_path)
+    assert issue.state is not None
+    assert issue.state.value == "closed"
+    assert issue.state_reason is not None
+    assert issue.state_reason.value == "completed"
+
+
+@patch("planhub.cli.commands.sync.get_github_repo_from_git")
+@patch("planhub.cli.commands.sync.get_auth_token")
+@patch("planhub.cli.commands.sync.GitHubClient")
+def test_sync_ignores_unknown_state_reason_from_github(
+    mock_client, mock_token, mock_repo, tmp_path, monkeypatch
+) -> None:
+    mock_token.return_value = "token"
+    mock_repo.return_value = ("acme", "roadmap")
+    client_instance = mock_client.return_value
+    client_instance.update_issue.return_value = {"state": "closed", "state_reason": "foo"}
+
+    layout = ensure_layout(tmp_path)
+    issue_path = layout.issues_dir / "issue.md"
+    issue_path.write_text(
+        '---\ntitle: "Ship it"\nnumber: 99\n---\n\nBody\n',
+        encoding="utf-8",
+    )
+
+    monkeypatch.chdir(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(app, ["sync"])
+
+    assert result.exit_code == 0
+    issue = load_issue_document(issue_path)
+    assert issue.state is not None
+    assert issue.state.value == "closed"
+    assert issue.state_reason is None
 
 
 @patch("planhub.cli.commands.sync.get_github_repo_from_git")
@@ -80,6 +120,7 @@ def test_sync_clears_labels_assignees_and_milestone(
     mock_token.return_value = "token"
     mock_repo.return_value = ("acme", "roadmap")
     client_instance = mock_client.return_value
+    client_instance.update_issue.return_value = {"state": "open"}
 
     layout = ensure_layout(tmp_path)
     issue_path = layout.issues_dir / "issue.md"
@@ -120,6 +161,7 @@ def test_sync_uses_numeric_milestone(
     mock_token.return_value = "token"
     mock_repo.return_value = ("acme", "roadmap")
     client_instance = mock_client.return_value
+    client_instance.update_issue.return_value = {"state": "open"}
 
     layout = ensure_layout(tmp_path)
     issue_path = layout.issues_dir / "issue.md"
