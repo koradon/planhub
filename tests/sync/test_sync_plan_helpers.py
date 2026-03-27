@@ -97,6 +97,36 @@ def test_archive_closed_issues_duplicate_target_gets_suffix(tmp_path) -> None:
     assert errors == []
 
 
+def test_archive_closed_issues_exhausts_suffixes_reports_error(tmp_path) -> None:
+    layout = ensure_layout(tmp_path)
+    issue_path = layout.issues_dir / "issue.md"
+    issue_path.write_text(
+        '---\ntitle: "Issue"\nnumber: 1\nstate: "closed"\nstate_reason: "completed"\n---\n',
+        encoding="utf-8",
+    )
+
+    archive_dir = tmp_path / ".plan" / "archive" / "issues"
+    archive_dir.mkdir(parents=True, exist_ok=True)
+
+    (archive_dir / "issue.md").write_text("existing-0", encoding="utf-8")
+    for index in range(1, 1000):
+        (archive_dir / f"issue-{index}.md").write_text(
+            f"existing-{index}",
+            encoding="utf-8",
+        )
+
+    cfg = _config(policy="archive", archive_dir=archive_dir)
+    errors: list[str] = []
+
+    archive_closed_issues_in_filesystem(layout, cfg, errors=errors, dry_run=False)
+
+    # Must not overwrite existing archive files when all suffixes are taken.
+    assert issue_path.exists()
+    assert errors and len(errors) == 1
+    assert "all suffixes 1..999 are taken" in errors[0]
+    assert (archive_dir / "issue.md").read_text(encoding="utf-8") == "existing-0"
+
+
 def test_state_updates_from_github_issue_handles_open_and_closed_reason() -> None:
     assert _state_updates_from_github_issue({"state": "open"}) == {
         "state": "open",

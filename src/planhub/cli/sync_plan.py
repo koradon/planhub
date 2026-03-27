@@ -465,6 +465,12 @@ def archive_closed_issues_in_filesystem(
                 if not candidate.exists():
                     target_path = candidate
                     break
+            else:
+                errors.append(
+                    f"{issue_path}: archive target collision; all suffixes 1..999 are taken for "
+                    f"{target_path}."
+                )
+                continue
 
         if not dry_run:
             target_path.parent.mkdir(parents=True, exist_ok=True)
