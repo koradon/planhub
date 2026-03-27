@@ -59,6 +59,30 @@ def test_archive_closed_issues_skips_unsynced_issue(tmp_path) -> None:
     assert errors == []
 
 
+def test_archive_closed_issues_skips_milestone_issues(tmp_path) -> None:
+    layout = ensure_layout(tmp_path)
+    milestone_dir = layout.milestones_dir / "stage-1"
+    milestone_dir.mkdir(parents=True, exist_ok=True)
+    (milestone_dir / "milestone.md").write_text(
+        '---\ntitle: "Stage 1"\nnumber: 1\nstate: "open"\n---\n',
+        encoding="utf-8",
+    )
+    issue_path = milestone_dir / "issues" / "issue.md"
+    issue_path.parent.mkdir(parents=True, exist_ok=True)
+    issue_path.write_text(
+        '---\ntitle: "Issue"\nnumber: 1\nstate: "closed"\nstate_reason: "completed"\n---\n',
+        encoding="utf-8",
+    )
+    cfg = _config(policy="archive", archive_dir=tmp_path / ".plan" / "archive" / "issues")
+    errors: list[str] = []
+
+    archive_closed_issues_in_filesystem(layout, cfg, errors=errors, dry_run=False)
+
+    assert issue_path.exists()
+    assert not (tmp_path / ".plan" / "archive" / "issues" / "issue.md").exists()
+    assert errors == []
+
+
 def test_archive_closed_issues_unsupported_policy_reports_error(tmp_path) -> None:
     layout = ensure_layout(tmp_path)
     issue_path = layout.issues_dir / "issue.md"
