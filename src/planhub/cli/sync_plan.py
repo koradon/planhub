@@ -14,10 +14,12 @@ from planhub.documents import (
     load_issue_document,
     load_milestone_document,
     milestone_document_to_metadata,
+    render_markdown,
     update_front_matter,
 )
 from planhub.github import GitHubClient, IssueState, IssueStateReason
 from planhub.layout import PlanLayout, discover_milestones, discover_root_issues
+from planhub.slug import slugify
 
 MAX_WORKERS = 5  # Conservative limit to avoid GitHub rate limits
 
@@ -30,6 +32,94 @@ class SyncPlan:
         self.issues_to_update: list[tuple[Path, IssueDocument, str | None]] = []
         self.milestone_numbers: dict[str, int] = {}
         self.milestone_titles_by_dir: dict[Path, str] = {}
+
+
+def _github_milestone_info_from_issue_payload(
+    issue_payload: Mapping[str, object] | object,
+) -> tuple[bool, Mapping[str, object] | None, str | None, int | None]:
+    if not isinstance(issue_payload, Mapping):
+        return False, None, None, None
+    sentinel_missing = object()
+    milestone_payload = issue_payload.get("milestone", sentinel_missing)
+    if milestone_payload is sentinel_missing:
+        # Treat missing `milestone` as "unknown" instead of "milestone cleared".
+        return False, None, None, None
+    if milestone_payload is None:
+        return True, None, None, None
+    if not isinstance(milestone_payload, Mapping):
+        return True, None, None, None
+    raw_title = milestone_payload.get("title")
+    milestone_title = raw_title if isinstance(raw_title, str) and raw_title.strip() else None
+    raw_number = milestone_payload.get("number")
+    milestone_number = raw_number if isinstance(raw_number, int) else None
+    return True, milestone_payload, milestone_title, milestone_number
+
+
+def _ensure_milestone_dir_and_doc(
+    layout: PlanLayout,
+    *,
+    milestone_slug: str,
+    milestone_payload: Mapping[str, object],
+) -> Path:
+    """Ensure milestone directory structure exists and milestone.md is present."""
+    milestone_dir = layout.milestones_dir / milestone_slug
+    issues_dir = milestone_dir / "issues"
+    issues_dir.mkdir(parents=True, exist_ok=True)
+
+    milestone_path = milestone_dir / "milestone.md"
+    if milestone_path.exists():
+        return issues_dir
+
+    title_raw = milestone_payload.get("title")
+    title = title_raw if isinstance(title_raw, str) and title_raw.strip() else milestone_slug
+    number_raw = milestone_payload.get("number")
+    number = number_raw if isinstance(number_raw, int) else None
+    description = milestone_payload.get("description")
+    description_str = description if isinstance(description, str) else None
+    due_on = milestone_payload.get("due_on")
+    due_on_str = due_on if isinstance(due_on, str) else None
+    state_raw = milestone_payload.get("state")
+    state = None
+    if isinstance(state_raw, str):
+        try:
+            state = IssueState(state_raw)
+        except ValueError:
+            state = None
+
+    milestone_doc = MilestoneDocument(
+        path=milestone_path,
+        title=title,
+        description=description_str,
+        due_on=due_on_str,
+        state=state,
+        milestone_id=None,
+        number=number,
+        body="",
+    )
+    content = render_markdown(milestone_document_to_metadata(milestone_doc), "")
+    milestone_path.write_text(content, encoding="utf-8")
+    return issues_dir
+
+
+def _move_issue_to_dir(issue_path: Path, *, target_dir: Path) -> Path:
+    """Move an issue markdown file to a new directory without overwriting."""
+    if issue_path.parent == target_dir:
+        return issue_path
+
+    target_dir.mkdir(parents=True, exist_ok=True)
+    target_path = target_dir / issue_path.name
+    if not target_path.exists():
+        issue_path.rename(target_path)
+        return target_path
+
+    for index in range(1, 1000):
+        candidate = target_path.with_name(f"{target_path.stem}-{index}{target_path.suffix}")
+        if not candidate.exists():
+            issue_path.rename(candidate)
+            return candidate
+
+    # If all candidates are taken, fall back to raising; collision is unexpected.
+    raise FileExistsError(f"Unable to move {issue_path} into {target_dir} due to collisions.")
 
 
 def build_sync_plan(
@@ -67,6 +157,7 @@ def apply_sync_plan(
     plan: SyncPlan,
     errors: list[str],
     config: PlanHubConfig,
+    layout: PlanLayout,
 ) -> None:
     if owner_repo is None:
         errors.append("Missing repository information for sync.")
@@ -75,7 +166,7 @@ def apply_sync_plan(
     _create_missing_milestones(client, owner, repo, plan, errors)
     _update_existing_milestones(client, owner, repo, plan, errors)
     _create_missing_issues(client, owner, repo, plan, errors, config)
-    _update_existing_issues(client, owner, repo, plan, errors, config)
+    _update_existing_issues(client, layout, owner, repo, plan, errors, config)
 
 
 def _collect_issues_for_entry(entry, plan: SyncPlan, errors: list[str]) -> int:
@@ -285,6 +376,7 @@ def _create_missing_issues(
 
 def _update_existing_issues(
     client: GitHubClient,
+    layout: PlanLayout,
     owner: str,
     repo: str,
     plan: SyncPlan,
@@ -292,23 +384,25 @@ def _update_existing_issues(
     config: PlanHubConfig,
 ) -> None:
     errors_lock = Lock()
+    milestone_creation_lock = Lock()
+    move_locks_by_dir: dict[Path, Lock] = {}
+    move_locks_registry_lock = Lock()
+
+    def _move_lock_for_dir(target_dir: Path) -> Lock:
+        with move_locks_registry_lock:
+            lock = move_locks_by_dir.get(target_dir)
+            if lock is None:
+                lock = Lock()
+                move_locks_by_dir[target_dir] = lock
+            return lock
 
     def update_single_issue(
         issue_path: Path, issue_doc: IssueDocument, milestone_title: str | None
     ) -> None:
+        del milestone_title  # Milestone placement is reconciled from GitHub.
         if issue_doc.number is None:
             with errors_lock:
                 errors.append(f"{issue_path}: missing issue number.")
-            return
-        local_errors: list[str] = []
-        milestone_number, clear_milestone = _resolve_milestone_number(
-            plan, issue_path, issue_doc, milestone_title, local_errors
-        )
-        if local_errors:
-            with errors_lock:
-                errors.extend(local_errors)
-            return
-        if (issue_doc.milestone or milestone_title) and milestone_number is None:
             return
         labels = (
             list(issue_doc.labels)
@@ -328,19 +422,64 @@ def _update_existing_issues(
             body=issue_doc.body or None,
             labels=labels,
             assignees=assignees,
-            milestone=milestone_number,
-            clear_milestone=clear_milestone,
             issue_type=issue_doc.issue_type,
             # Keep issue state authoritative on GitHub during sync.
             state=None,
             state_reason=None,
         )
         state_updates = _state_updates_from_github_issue(updated_issue)
-        if state_updates:
+
+        (
+            milestone_field_present,
+            milestone_payload,
+            milestone_title_github,
+            milestone_number_github,
+        ) = _github_milestone_info_from_issue_payload(updated_issue)
+
+        milestone_updates: dict[str, object] = {}
+        if milestone_field_present:
+            if milestone_title_github is None and milestone_number_github is None:
+                # GitHub indicates no milestone.
+                target_parent_dir = layout.issues_dir
+            else:
+                milestone_slug = slugify(
+                    milestone_title_github or str(milestone_number_github),
+                    fallback="milestone",
+                )
+                # Ensure local milestone structure exists so the rename/move succeeds.
+                if milestone_payload is not None:
+                    with milestone_creation_lock:
+                        target_parent_dir = _ensure_milestone_dir_and_doc(
+                            layout,
+                            milestone_slug=milestone_slug,
+                            milestone_payload=milestone_payload,
+                        )
+                else:
+                    # Fallback: ensure directory even if milestone payload is incomplete.
+                    target_parent_dir = layout.milestones_dir / milestone_slug / "issues"
+                    target_parent_dir.mkdir(parents=True, exist_ok=True)
+
+            if issue_path.parent != target_parent_dir:
+                # Serialize moves per target directory to avoid rename races.
+                with _move_lock_for_dir(target_parent_dir):
+                    issue_path = _move_issue_to_dir(issue_path, target_dir=target_parent_dir)
+
+            if milestone_title_github is not None or milestone_number_github is not None:
+                if milestone_number_github is not None:
+                    milestone_updates["milestone"] = milestone_number_github
+                else:
+                    milestone_updates["milestone"] = milestone_title_github
+            elif issue_doc.milestone_set:
+                milestone_updates["milestone"] = None
+
+        updates: dict[str, object] = {}
+        updates.update(state_updates)
+        updates.update(milestone_updates)
+        if updates:
             cached_metadata = issue_document_to_metadata(issue_doc)
             update_front_matter(
                 issue_path,
-                state_updates,
+                updates,
                 cached_metadata=cached_metadata,
                 cached_body=issue_doc.body,
             )

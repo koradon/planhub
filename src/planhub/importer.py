@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
@@ -16,6 +15,7 @@ from planhub.documents import (
     update_front_matter,
 )
 from planhub.layout import PlanLayout, discover_milestones, discover_root_issues
+from planhub.slug import slugify
 
 
 @dataclass(frozen=True)
@@ -112,7 +112,7 @@ def _ensure_milestone_dir(
     title = milestone.get("title")
     if not title:
         return None
-    slug = _slugify(title)
+    slug = slugify(str(title).strip(), fallback="milestone")
     milestone_dir = layout.milestones_dir / slug
     milestone_path = milestone_dir / "milestone.md"
     created = False
@@ -264,22 +264,10 @@ def _write_milestone(milestone: MilestoneDocument) -> None:
     milestone.path.write_text(content, encoding="utf-8")
 
 
-def _slugify(value: str) -> str:
-    slug = []
-    for char in value.lower():
-        if char.isalnum():
-            slug.append(char)
-        elif char in {" ", "-", "_"}:
-            slug.append("-")
-    normalized = "".join(slug).strip("-")
-    normalized = re.sub(r"-+", "-", normalized)
-    return normalized or "milestone"
-
-
 def _issue_path_for_import(directory: Path, issue: Mapping[str, Any]) -> Path:
     created_at = issue.get("created_at")
     created_at_str = _format_date(created_at)
-    title = _slugify(str(issue.get("title", "")).strip()) or "issue"
+    title = slugify(str(issue.get("title", "")).strip(), fallback="milestone") or "issue"
     base_name = f"{created_at_str}-{title}"
     path = directory / f"{base_name}.md"
     if not path.exists():
