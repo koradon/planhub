@@ -165,6 +165,11 @@ The script will:
 
 The changelog commit includes all commit messages since the last tag, making it easy to see what changed in each release on GitHub.
 
+## License
+
+Planhub is licensed under the [GNU Affero General Public License v3.0](LICENSE)
+(AGPL-3.0). See `LICENSE` for the full text.
+
 ## Next Steps
 - Implement the parsing + GitHub sync logic.
 - Add CI to validate file formats.
