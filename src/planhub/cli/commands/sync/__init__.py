@@ -17,6 +17,7 @@ from planhub.documents import DocumentError  # noqa: F401
 from planhub.github import GitHubClient
 from planhub.importer import ImportResult, import_existing_issues
 from planhub.layout import PlanLayout, load_layout
+from planhub.milestone_sync import reconcile_milestone_states_from_github
 from planhub.repository import get_github_repo_from_git
 
 
@@ -49,6 +50,23 @@ def sync_command(*, dry_run: bool, verbosity_override: str | None = None) -> Non
     errors: list[str] = []
     stats = SyncOutputStats()
 
+    client: GitHubClient | None = None
+    owner_repo: tuple[str, str] | None = None
+    auth = _get_github_client(repo_root)
+    if auth is not None:
+        client, owner, repo = auth
+        owner_repo = (owner, repo)
+        reconcile_milestone_states_from_github(
+            client,
+            owner,
+            repo,
+            layout,
+            errors=errors,
+            dry_run=dry_run,
+        )
+        if _report_parse_errors(errors):
+            raise typer.Exit(code=1)
+
     reconcile_milestone_archive_locations(
         layout,
         errors=errors,
@@ -59,10 +77,10 @@ def sync_command(*, dry_run: bool, verbosity_override: str | None = None) -> Non
     if _report_parse_errors(errors):
         raise typer.Exit(code=1)
 
-    client: GitHubClient | None = None
-    owner_repo, import_stats = _import_existing_issues_if_possible(
+    import_stats = _import_existing_issues(
         layout,
-        repo_root,
+        owner_repo,
+        client=client,
         dry_run=dry_run,
     )
     stats = SyncOutputStats(
@@ -71,8 +89,16 @@ def sync_command(*, dry_run: bool, verbosity_override: str | None = None) -> Non
         imported_skipped=import_stats.issues_skipped,
         imported_milestones_created=import_stats.milestones_created,
     )
-    if owner_repo is not None:
-        client, owner_repo = owner_repo
+
+    reconcile_milestone_archive_locations(
+        layout,
+        errors=errors,
+        dry_run=dry_run,
+        move_open_to_active=True,
+        move_closed_to_archive=False,
+    )
+    if _report_parse_errors(errors):
+        raise typer.Exit(code=1)
 
     plan, parsed_milestones, parsed_issues, errors = build_sync_plan(layout)
     if _report_parse_errors(errors):
@@ -168,30 +194,29 @@ def sync_command(*, dry_run: bool, verbosity_override: str | None = None) -> Non
         _echo_verbose_plan(plan)
 
 
-def _import_existing_issues_if_possible(
+def _import_existing_issues(
     layout: PlanLayout,
-    repo_root: Path,
+    owner_repo: tuple[str, str] | None,
     *,
+    client: GitHubClient | None,
     dry_run: bool,
-) -> tuple[tuple[GitHubClient, tuple[str, str]] | None, ImportResult]:
+) -> ImportResult:
     empty_result = ImportResult(
         issues_created=0,
         issues_moved=0,
         milestones_created=0,
         issues_skipped=0,
     )
-    auth = _get_github_client(repo_root)
-    if auth is None:
-        return None, empty_result
-    client, owner, repo = auth
-    result = import_existing_issues(
+    if client is None or owner_repo is None:
+        return empty_result
+    owner, repo = owner_repo
+    return import_existing_issues(
         layout,
         owner,
         repo,
         client=client,
         dry_run=dry_run,
     )
-    return (client, (owner, repo)), result
 
 
 def _report_parse_errors(errors: list[str]) -> bool:

@@ -163,6 +163,26 @@ class GitHubClient:
             page += 1
         return issues
 
+    def list_milestones(
+        self, owner: str, repo: str, state: str = "open"
+    ) -> list[Mapping[str, Any]]:
+        milestones: list[Mapping[str, Any]] = []
+        page = 1
+        while True:
+            path = f"/repos/{owner}/{repo}/milestones?state={state}&per_page=100&page={page}"
+            data, headers = self._request_with_headers("GET", path)
+            if not isinstance(data, list):
+                raise GitHubAPIError(
+                    status_code=500,
+                    message="Unexpected milestones response.",
+                    response_body={"data": data},
+                )
+            milestones.extend(data)
+            if not _has_next_link(headers.get("Link")):
+                break
+            page += 1
+        return milestones
+
     def close_issue(
         self,
         owner: str,

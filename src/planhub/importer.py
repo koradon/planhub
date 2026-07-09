@@ -9,12 +9,12 @@ from typing import Any
 from planhub.documents import (
     DocumentError,
     IssueDocument,
-    MilestoneDocument,
     load_issue_document,
     render_markdown,
     update_front_matter,
 )
-from planhub.layout import PlanLayout, discover_milestones, discover_root_issues
+from planhub.layout import PlanLayout, discover_all_milestones, discover_root_issues
+from planhub.milestone_sync import ensure_milestone_from_github
 from planhub.slug import slugify
 
 
@@ -54,15 +54,22 @@ def import_existing_issues(
         milestone = issue.get("milestone")
         milestone_title = None
         milestone_dir = None
-        if milestone:
+        issue_state = issue.get("state")
+        if milestone and issue_state != "closed":
             milestone_title = milestone.get("title")
             if milestone_title:
-                milestone_dir = _ensure_milestone_dir(layout, milestone, dry_run=dry_run)
+                milestone_dir = ensure_milestone_from_github(layout, milestone, dry_run=dry_run)
                 if milestone_dir and milestone_dir[1]:
                     milestones_created += 1
 
         if number in existing_issues:
             existing_path = existing_issues[number]
+            if milestone_dir is None and milestone and issue_state != "closed":
+                milestone_title = milestone.get("title")
+                if milestone_title:
+                    milestone_dir = ensure_milestone_from_github(layout, milestone, dry_run=dry_run)
+                    if milestone_dir and milestone_dir[1]:
+                        milestones_created += 1
             if _maybe_move_issue(existing_path, milestone_dir, dry_run=dry_run):
                 issues_moved += 1
             else:
@@ -74,6 +81,14 @@ def import_existing_issues(
                 existing_path = existing_by_content[content_key]
                 if not dry_run:
                     update_front_matter(existing_path, {"number": number})
+                if milestone_dir is None and milestone and issue_state != "closed":
+                    milestone_title = milestone.get("title")
+                    if milestone_title:
+                        milestone_dir = ensure_milestone_from_github(
+                            layout, milestone, dry_run=dry_run
+                        )
+                        if milestone_dir and milestone_dir[1]:
+                            milestones_created += 1
                 if _maybe_move_issue(existing_path, milestone_dir, dry_run=dry_run):
                     issues_moved += 1
                 else:
@@ -82,7 +97,6 @@ def import_existing_issues(
 
         # Only create files for open issues. Closed issues should not be created
         # in the file system. If a closed issue is reopened, it will be imported.
-        issue_state = issue.get("state")
         if issue_state != "open":
             issues_skipped += 1
             continue
@@ -104,31 +118,6 @@ def import_existing_issues(
         milestones_created=milestones_created,
         issues_skipped=issues_skipped,
     )
-
-
-def _ensure_milestone_dir(
-    layout: PlanLayout, milestone: Mapping[str, Any], *, dry_run: bool
-) -> tuple[Path, bool] | None:
-    title = milestone.get("title")
-    if not title:
-        return None
-    slug = slugify(str(title).strip(), fallback="milestone")
-    milestone_dir = layout.milestones_dir / slug
-    milestone_path = milestone_dir / "milestone.md"
-    created = False
-    if not milestone_dir.exists():
-        if not dry_run:
-            milestone_dir.mkdir(parents=True, exist_ok=True)
-        created = True
-    if not milestone_path.exists():
-        milestone_doc = _milestone_document_from_api(milestone, milestone_path)
-        if not dry_run:
-            _write_milestone(milestone_doc)
-        created = True
-    issues_dir = milestone_dir / "issues"
-    if not issues_dir.exists() and not dry_run:
-        issues_dir.mkdir(parents=True, exist_ok=True)
-    return issues_dir, created
 
 
 def _maybe_move_issue(
@@ -153,7 +142,7 @@ def _collect_existing_issues(layout: PlanLayout) -> dict[int, Path]:
     numbers: dict[int, Path] = {}
     for issue_path in discover_root_issues(layout):
         _try_add_issue_number(issue_path, numbers)
-    for entry in discover_milestones(layout):
+    for entry in discover_all_milestones(layout):
         for issue_path in entry.issue_files:
             _try_add_issue_number(issue_path, numbers)
     return numbers
@@ -163,7 +152,7 @@ def _collect_existing_by_content(layout: PlanLayout) -> dict[tuple[str, str], Pa
     entries: dict[tuple[str, str], Path] = {}
     for issue_path in discover_root_issues(layout):
         _try_add_issue_content(issue_path, entries)
-    for entry in discover_milestones(layout):
+    for entry in discover_all_milestones(layout):
         for issue_path in entry.issue_files:
             _try_add_issue_content(issue_path, entries)
     return entries
@@ -219,19 +208,6 @@ def _issue_document_from_api(
     )
 
 
-def _milestone_document_from_api(milestone: Mapping[str, Any], path: Path) -> MilestoneDocument:
-    return MilestoneDocument(
-        path=path,
-        title=str(milestone.get("title", "")).strip(),
-        description=milestone.get("description"),
-        due_on=milestone.get("due_on"),
-        state=None if not milestone.get("state") else _parse_state(milestone["state"]),
-        milestone_id=None,
-        number=milestone.get("number"),
-        body="",
-    )
-
-
 def _write_issue(issue: IssueDocument) -> None:
     front_matter: dict[str, Any] = {"title": issue.title, "number": issue.number}
     if issue.labels:
@@ -249,19 +225,6 @@ def _write_issue(issue: IssueDocument) -> None:
     content = render_markdown(front_matter, issue.body)
     issue.path.parent.mkdir(parents=True, exist_ok=True)
     issue.path.write_text(content, encoding="utf-8")
-
-
-def _write_milestone(milestone: MilestoneDocument) -> None:
-    front_matter: dict[str, Any] = {"title": milestone.title, "number": milestone.number}
-    if milestone.description:
-        front_matter["description"] = milestone.description
-    if milestone.due_on:
-        front_matter["due_on"] = milestone.due_on
-    if milestone.state:
-        front_matter["state"] = milestone.state.value
-    content = render_markdown(front_matter, "")
-    milestone.path.parent.mkdir(parents=True, exist_ok=True)
-    milestone.path.write_text(content, encoding="utf-8")
 
 
 def _issue_path_for_import(directory: Path, issue: Mapping[str, Any]) -> Path:

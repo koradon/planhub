@@ -141,6 +141,20 @@ def test_list_issues_paginates() -> None:
     assert mock_session.request.call_count == 2
 
 
+def test_list_milestones_paginates() -> None:
+    mock_session = MagicMock()
+    mock_session.request.side_effect = [
+        _create_mock_response([{"number": 1}], headers={"Link": '<x>; rel="next"'}),
+        _create_mock_response([{"number": 2}], headers={}),
+    ]
+
+    client = GitHubClient(token="token-123", session=mock_session)
+    milestones = client.list_milestones("acme", "roadmap", state="all")
+
+    assert [milestone["number"] for milestone in milestones] == [1, 2]
+    assert mock_session.request.call_count == 2
+
+
 def test_update_issue_clears_milestone_and_guards_state_reason() -> None:
     mock_session = MagicMock()
     mock_session.request.return_value = _create_mock_response({"id": 1})
@@ -197,7 +211,7 @@ def test_rate_limit_retries_after_reset() -> None:
 
     client = GitHubClient(token="token-123", session=mock_session)
 
-    with patch("planhub.github.time.time", return_value=99):
+    with patch("planhub.github.time.time", return_value=99), patch("planhub.github.time.sleep"):
         payload = client.create_issue("acme", "roadmap", "Ship it")
 
     assert payload["id"] == 1
