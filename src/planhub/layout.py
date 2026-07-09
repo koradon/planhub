@@ -47,9 +47,26 @@ def load_layout(repo_root: Path) -> PlanLayout:
     return PlanLayout(root=plan_root, milestones_dir=milestones_dir, issues_dir=issues_dir)
 
 
-def discover_milestones(layout: PlanLayout) -> tuple[MilestoneEntry, ...]:
+def milestone_archive_root(layout: PlanLayout) -> Path:
+    return layout.root / "archive" / "milestones"
+
+
+def milestone_dir_for_slug(layout: PlanLayout, slug: str, *, closed: bool) -> Path:
+    root = milestone_archive_root(layout) if closed else layout.milestones_dir
+    return root / slug
+
+
+def find_existing_milestone_dir(layout: PlanLayout, slug: str) -> Path | None:
+    for root in (layout.milestones_dir, milestone_archive_root(layout)):
+        candidate = root / slug
+        if candidate.is_dir():
+            return candidate
+    return None
+
+
+def _milestone_entries_for_root(milestones_root: Path) -> list[MilestoneEntry]:
     entries: list[MilestoneEntry] = []
-    for milestone_dir in _sorted_dirs(layout.milestones_dir):
+    for milestone_dir in _sorted_dirs(milestones_root):
         milestone_file = milestone_dir / MILESTONE_FILENAME
         issue_files = _sorted_files(milestone_dir / ISSUES_DIR_NAME, "*.md")
         entries.append(
@@ -59,6 +76,16 @@ def discover_milestones(layout: PlanLayout) -> tuple[MilestoneEntry, ...]:
                 issue_files=issue_files,
             )
         )
+    return entries
+
+
+def discover_milestones(layout: PlanLayout) -> tuple[MilestoneEntry, ...]:
+    return tuple(_milestone_entries_for_root(layout.milestones_dir))
+
+
+def discover_all_milestones(layout: PlanLayout) -> tuple[MilestoneEntry, ...]:
+    entries = _milestone_entries_for_root(layout.milestones_dir)
+    entries.extend(_milestone_entries_for_root(milestone_archive_root(layout)))
     return tuple(entries)
 
 

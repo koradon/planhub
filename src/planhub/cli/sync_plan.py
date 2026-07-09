@@ -16,11 +16,18 @@ from planhub.documents import (
     load_issue_document,
     load_milestone_document,
     milestone_document_to_metadata,
-    render_markdown,
     update_front_matter,
 )
 from planhub.github import GitHubClient, IssueState, IssueStateReason
-from planhub.layout import PlanLayout, discover_milestones, discover_root_issues
+from planhub.layout import (
+    PlanLayout,
+    discover_milestones,
+    discover_root_issues,
+    find_existing_milestone_dir,
+    milestone_archive_root,
+    milestone_dir_for_slug,
+)
+from planhub.milestone_sync import ensure_milestone_from_github
 from planhub.slug import slugify
 
 MAX_WORKERS = 5  # Conservative limit to avoid GitHub rate limits
@@ -78,42 +85,14 @@ def _ensure_milestone_dir_and_doc(
     milestone_payload: Mapping[str, object],
 ) -> Path:
     """Ensure milestone directory structure exists and milestone.md is present."""
-    milestone_dir = layout.milestones_dir / milestone_slug
+    ensured = ensure_milestone_from_github(layout, milestone_payload, dry_run=False)
+    if ensured is not None:
+        return ensured[0]
+    milestone_dir = find_existing_milestone_dir(layout, milestone_slug)
+    if milestone_dir is None:
+        milestone_dir = milestone_dir_for_slug(layout, milestone_slug, closed=False)
     issues_dir = milestone_dir / "issues"
     issues_dir.mkdir(parents=True, exist_ok=True)
-
-    milestone_path = milestone_dir / "milestone.md"
-    if milestone_path.exists():
-        return issues_dir
-
-    title_raw = milestone_payload.get("title")
-    title = title_raw if isinstance(title_raw, str) and title_raw.strip() else milestone_slug
-    number_raw = milestone_payload.get("number")
-    number = number_raw if isinstance(number_raw, int) else None
-    description = milestone_payload.get("description")
-    description_str = description if isinstance(description, str) else None
-    due_on = milestone_payload.get("due_on")
-    due_on_str = due_on if isinstance(due_on, str) else None
-    state_raw = milestone_payload.get("state")
-    state = None
-    if isinstance(state_raw, str):
-        try:
-            state = IssueState(state_raw)
-        except ValueError:
-            state = None
-
-    milestone_doc = MilestoneDocument(
-        path=milestone_path,
-        title=title,
-        description=description_str,
-        due_on=due_on_str,
-        state=state,
-        milestone_id=None,
-        number=number,
-        body="",
-    )
-    content = render_markdown(milestone_document_to_metadata(milestone_doc), "")
-    milestone_path.write_text(content, encoding="utf-8")
     return issues_dir
 
 
@@ -300,7 +279,6 @@ def _update_existing_milestones(
             title=milestone_doc.title,
             description=milestone_doc.description,
             due_on=milestone_doc.due_on,
-            state=milestone_doc.state.value if milestone_doc.state else None,
         )
 
     _run_parallel(
@@ -495,7 +473,10 @@ def _update_existing_issues(
                         )
                 else:
                     # Fallback: ensure directory even if milestone payload is incomplete.
-                    target_parent_dir = layout.milestones_dir / milestone_slug / "issues"
+                    milestone_dir = find_existing_milestone_dir(layout, milestone_slug)
+                    if milestone_dir is None:
+                        milestone_dir = milestone_dir_for_slug(layout, milestone_slug, closed=False)
+                    target_parent_dir = milestone_dir / "issues"
                     target_parent_dir.mkdir(parents=True, exist_ok=True)
 
             if issue_path.parent != target_parent_dir:
@@ -658,28 +639,44 @@ def reconcile_milestone_archive_locations(
     move_closed_to_archive: bool,
 ) -> None:
     """Move milestone directories between active and archive roots based on state."""
-    milestone_archive_root = layout.root / "archive" / "milestones"
+    milestone_archive_root_path = milestone_archive_root(layout)
 
     def _iter_milestone_dirs(parent: Path) -> tuple[Path, ...]:
         if not parent.exists():
             return ()
         return tuple(sorted(path for path in parent.iterdir() if path.is_dir()))
 
-    def _move_milestone_dir(source_dir: Path, target_root: Path) -> None:
+    def _move_milestone_dir(
+        source_dir: Path,
+        target_root: Path,
+        *,
+        on_collision: str,
+    ) -> None:
+        """Move a milestone directory, resolving duplicate slug collisions.
+
+        on_collision:
+          - "keep_target": target already holds the canonical copy; drop source.
+          - "keep_source": source is authoritative; replace target then move.
+        """
         target_dir = target_root / source_dir.name
-        if target_dir.exists():
-            errors.append(
-                f"{source_dir}: cannot move milestone directory because target already exists: "
-                f"{target_dir}."
-            )
-            return
         if dry_run:
             return
         target_root.mkdir(parents=True, exist_ok=True)
+        if target_dir.exists():
+            if on_collision == "keep_target":
+                shutil.rmtree(source_dir)
+            elif on_collision == "keep_source":
+                shutil.rmtree(target_dir)
+                shutil.move(str(source_dir), str(target_dir))
+            else:
+                errors.append(
+                    f"{source_dir}: unsupported milestone collision policy: {on_collision}."
+                )
+            return
         shutil.move(str(source_dir), str(target_dir))
 
     if move_open_to_active:
-        for archived_dir in _iter_milestone_dirs(milestone_archive_root):
+        for archived_dir in _iter_milestone_dirs(milestone_archive_root_path):
             milestone_path = archived_dir / "milestone.md"
             if not milestone_path.exists():
                 continue
@@ -689,7 +686,11 @@ def reconcile_milestone_archive_locations(
                 errors.append(str(exc))
                 continue
             if milestone_doc.state == IssueState.OPEN:
-                _move_milestone_dir(archived_dir, layout.milestones_dir)
+                _move_milestone_dir(
+                    archived_dir,
+                    layout.milestones_dir,
+                    on_collision="keep_source",
+                )
 
     if move_closed_to_archive:
         for entry in discover_milestones(layout):
@@ -699,4 +700,8 @@ def reconcile_milestone_archive_locations(
                 errors.append(str(exc))
                 continue
             if milestone_doc.state == IssueState.CLOSED:
-                _move_milestone_dir(entry.directory, milestone_archive_root)
+                _move_milestone_dir(
+                    entry.directory,
+                    milestone_archive_root_path,
+                    on_collision="keep_target",
+                )

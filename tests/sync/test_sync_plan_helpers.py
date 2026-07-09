@@ -5,6 +5,7 @@ from pathlib import Path
 from planhub.cli.sync_plan import (
     _state_updates_from_github_issue,
     archive_closed_issues_in_filesystem,
+    reconcile_milestone_archive_locations,
 )
 from planhub.config import (
     PlanHubConfig,
@@ -177,6 +178,98 @@ def test_archive_closed_issues_delete_policy_counts_deletions(tmp_path) -> None:
     assert errors == []
     assert stats.deleted_count == 1
     assert stats.archived_count == 0
+
+
+def test_reconcile_closed_milestone_discards_active_duplicate_when_archive_exists(tmp_path) -> None:
+    layout = ensure_layout(tmp_path)
+    milestone_dir = layout.milestones_dir / "stage-1"
+    milestone_dir.mkdir(parents=True, exist_ok=True)
+    (milestone_dir / "milestone.md").write_text(
+        '---\ntitle: "Stage 1"\nnumber: 1\nstate: "closed"\n---\n\nDuplicate body\n',
+        encoding="utf-8",
+    )
+
+    archived_dir = tmp_path / ".plan" / "archive" / "milestones" / "stage-1"
+    archived_dir.mkdir(parents=True, exist_ok=True)
+    (archived_dir / "milestone.md").write_text(
+        '---\ntitle: "Stage 1"\nnumber: 1\nstate: "closed"\n---\n\nArchive body\n',
+        encoding="utf-8",
+    )
+
+    errors: list[str] = []
+    reconcile_milestone_archive_locations(
+        layout,
+        errors=errors,
+        dry_run=False,
+        move_open_to_active=False,
+        move_closed_to_archive=True,
+    )
+
+    assert errors == []
+    assert not milestone_dir.exists()
+    assert archived_dir.exists()
+    assert "Archive body" in (archived_dir / "milestone.md").read_text(encoding="utf-8")
+
+
+def test_reconcile_reopened_milestone_replaces_stale_active_duplicate(tmp_path) -> None:
+    layout = ensure_layout(tmp_path)
+    active_dir = layout.milestones_dir / "stage-1"
+    active_dir.mkdir(parents=True, exist_ok=True)
+    (active_dir / "milestone.md").write_text(
+        '---\ntitle: "Stage 1"\nnumber: 1\nstate: "closed"\n---\n\nStale body\n',
+        encoding="utf-8",
+    )
+
+    archived_dir = tmp_path / ".plan" / "archive" / "milestones" / "stage-1"
+    archived_dir.mkdir(parents=True, exist_ok=True)
+    (archived_dir / "milestone.md").write_text(
+        '---\ntitle: "Stage 1"\nnumber: 1\nstate: "open"\n---\n\nCurrent body\n',
+        encoding="utf-8",
+    )
+
+    errors: list[str] = []
+    reconcile_milestone_archive_locations(
+        layout,
+        errors=errors,
+        dry_run=False,
+        move_open_to_active=True,
+        move_closed_to_archive=False,
+    )
+
+    assert errors == []
+    assert active_dir.exists()
+    assert not archived_dir.exists()
+    assert "Current body" in (active_dir / "milestone.md").read_text(encoding="utf-8")
+
+
+def test_reconcile_closed_milestone_collision_dry_run_reports_no_error(tmp_path) -> None:
+    layout = ensure_layout(tmp_path)
+    milestone_dir = layout.milestones_dir / "stage-1"
+    milestone_dir.mkdir(parents=True, exist_ok=True)
+    (milestone_dir / "milestone.md").write_text(
+        '---\ntitle: "Stage 1"\nnumber: 1\nstate: "closed"\n---\n',
+        encoding="utf-8",
+    )
+
+    archived_dir = tmp_path / ".plan" / "archive" / "milestones" / "stage-1"
+    archived_dir.mkdir(parents=True, exist_ok=True)
+    (archived_dir / "milestone.md").write_text(
+        '---\ntitle: "Stage 1"\nnumber: 1\nstate: "closed"\n---\n',
+        encoding="utf-8",
+    )
+
+    errors: list[str] = []
+    reconcile_milestone_archive_locations(
+        layout,
+        errors=errors,
+        dry_run=True,
+        move_open_to_active=False,
+        move_closed_to_archive=True,
+    )
+
+    assert errors == []
+    assert milestone_dir.exists()
+    assert archived_dir.exists()
 
 
 def test_state_updates_from_github_issue_handles_open_and_closed_reason() -> None:

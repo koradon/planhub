@@ -58,6 +58,8 @@ Without this setup step, sync defaults and other CLI behavior may be missing.
   - Prints explicit operation counts for import/create/update/archive/delete.
   - Writes the GitHub `number` back into each file after creation.
   - GitHub is the source of truth for issue state during sync.
+  - GitHub is also the source of truth for milestone `state` during sync; local
+    milestone files are reconciled from GitHub before archive moves run.
   - For existing issues, sync does not push local `state` or `state_reason` to
     GitHub; it reconciles those fields from the GitHub response.
   - Sync runs in three phases: parse files, build a sync plan, then apply it.

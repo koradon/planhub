@@ -505,12 +505,13 @@ def test_sync_creates_milestone_md_with_details_from_github(
 @patch("planhub.cli.commands.sync.get_github_repo_from_git")
 @patch("planhub.cli.commands.sync.get_auth_token")
 @patch("planhub.cli.commands.sync.GitHubClient")
-def test_sync_does_not_overwrite_existing_milestone_md(
+def test_sync_updates_existing_milestone_md_from_github(
     mock_client, mock_token, mock_repo, tmp_path, monkeypatch
 ) -> None:
     mock_token.return_value = "token"
     mock_repo.return_value = ("acme", "roadmap")
     client_instance = mock_client.return_value
+    client_instance.list_milestones.return_value = []
     client_instance.update_issue.return_value = {
         "state": "open",
         "milestone": {
@@ -538,7 +539,6 @@ def test_sync_does_not_overwrite_existing_milestone_md(
         ),
         encoding="utf-8",
     )
-    original_text = milestone_md_path.read_text(encoding="utf-8")
 
     issue_path = layout.issues_dir / "issue.md"
     issue_path.write_text(
@@ -565,8 +565,9 @@ def test_sync_does_not_overwrite_existing_milestone_md(
     assert moved_issue_path.exists()
     assert not issue_path.exists()
 
-    # Milestone doc should remain unchanged if it already exists locally.
-    assert milestone_md_path.read_text(encoding="utf-8") == original_text
+    milestone = load_milestone_document(milestone_md_path)
+    assert milestone.number == 7
+    assert milestone.description == "New description from GitHub"
 
 
 @patch("planhub.cli.commands.sync.get_github_repo_from_git")
@@ -620,6 +621,7 @@ def test_sync_milestone_when_title_missing_uses_number_slug(
     mock_token.return_value = "token"
     mock_repo.return_value = ("acme", "roadmap")
     client_instance = mock_client.return_value
+    client_instance.list_milestones.return_value = []
     client_instance.update_issue.return_value = {
         "state": "open",
         "milestone": {"title": "", "number": 7},
