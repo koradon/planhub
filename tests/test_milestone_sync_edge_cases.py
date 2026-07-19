@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from planhub.documents import load_milestone_document
 from planhub.layout import ensure_layout
 from planhub.milestone_sync import (
     ensure_milestone_from_github,
@@ -75,7 +76,9 @@ def test_reconcile_milestone_states_from_github_reports_list_failure(tmp_path) -
     assert errors and "Failed to list GitHub milestones" in errors[0]
 
 
-def test_reconcile_milestone_states_from_github_skips_unknown_local_milestones(tmp_path) -> None:
+def test_reconcile_milestone_states_from_github_creates_missing_open_milestone(
+    tmp_path,
+) -> None:
     layout = ensure_layout(tmp_path)
     client = type(
         "Client",
@@ -97,8 +100,85 @@ def test_reconcile_milestone_states_from_github_skips_unknown_local_milestones(t
         dry_run=False,
     )
 
-    assert updated == 0
+    assert updated == 1
     assert errors == []
+    milestone_dir = layout.milestones_dir / "gh-only"
+    assert milestone_dir.exists()
+    assert (milestone_dir / "issues").is_dir()
+    milestone = load_milestone_document(milestone_dir / "milestone.md")
+    assert milestone.number == 99
+    assert milestone.state is not None
+    assert milestone.state.value == "open"
+
+
+def test_reconcile_milestone_states_from_github_creates_missing_closed_milestone(
+    tmp_path,
+) -> None:
+    layout = ensure_layout(tmp_path)
+    client = type(
+        "Client",
+        (),
+        {
+            "list_milestones": lambda self, owner, repo, state="all": [
+                {
+                    "title": "Done stage",
+                    "number": 7,
+                    "state": "closed",
+                    "description": "All issues done",
+                }
+            ]
+        },
+    )()
+    errors: list[str] = []
+
+    updated = reconcile_milestone_states_from_github(
+        client,
+        "acme",
+        "roadmap",
+        layout,
+        errors=errors,
+        dry_run=False,
+    )
+
+    assert updated == 1
+    assert errors == []
+    archived = layout.root / "archive" / "milestones" / "done-stage"
+    assert archived.exists()
+    assert not (layout.milestones_dir / "done-stage").exists()
+    milestone = load_milestone_document(archived / "milestone.md")
+    assert milestone.number == 7
+    assert milestone.state is not None
+    assert milestone.state.value == "closed"
+    assert milestone.description == "All issues done"
+
+
+def test_reconcile_milestone_states_from_github_dry_run_does_not_create_missing(
+    tmp_path,
+) -> None:
+    layout = ensure_layout(tmp_path)
+    client = type(
+        "Client",
+        (),
+        {
+            "list_milestones": lambda self, owner, repo, state="all": [
+                {"title": "GH only", "number": 99, "state": "open"}
+            ]
+        },
+    )()
+    errors: list[str] = []
+
+    updated = reconcile_milestone_states_from_github(
+        client,
+        "acme",
+        "roadmap",
+        layout,
+        errors=errors,
+        dry_run=True,
+    )
+
+    assert updated == 1
+    assert errors == []
+    assert not (layout.milestones_dir / "gh-only").exists()
 
 
 def test_reconcile_milestone_states_from_github_dry_run_counts_without_writing(tmp_path) -> None:
