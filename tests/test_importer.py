@@ -161,7 +161,7 @@ def test_import_moves_existing_issue_by_content(tmp_path) -> None:
     assert load_issue_document(moved_path).number == 7
 
 
-def test_import_skips_closed_issues(tmp_path) -> None:
+def test_import_skips_closed_root_issues(tmp_path) -> None:
     issues = [
         {
             "number": 5,
@@ -189,7 +189,7 @@ def test_import_skips_closed_issues(tmp_path) -> None:
     assert not (layout.issues_dir / "20260127-closed-issue.md").exists()
 
 
-def test_import_skips_closed_milestone_dir_for_closed_issues(tmp_path) -> None:
+def test_import_creates_closed_issues_inside_milestone(tmp_path) -> None:
     issues = [
         {
             "number": 11,
@@ -224,10 +224,57 @@ def test_import_skips_closed_milestone_dir_for_closed_issues(tmp_path) -> None:
         dry_run=False,
     )
 
-    assert result.issues_created == 0
-    assert result.issues_skipped == 1
+    assert result.issues_created == 1
+    assert result.issues_skipped == 0
     assert result.milestones_created == 0
     assert not (layout.milestones_dir / "closed-stage").exists()
+    issue_path = archived_milestone / "issues" / "20260127-done-issue.md"
+    assert issue_path.exists()
+    issue = load_issue_document(issue_path)
+    assert issue.number == 11
+    assert issue.state is not None
+    assert issue.state.value == "closed"
+    assert issue.state_reason is not None
+    assert issue.state_reason.value == "completed"
+    assert issue.milestone == "Closed stage"
+
+
+def test_import_creates_closed_issues_in_open_milestone(tmp_path) -> None:
+    issues = [
+        {
+            "number": 12,
+            "title": "Finished work",
+            "body": "Done",
+            "state": "closed",
+            "state_reason": "completed",
+            "created_at": "2026-01-27T14:00:00Z",
+            "milestone": {
+                "title": "Stage 1",
+                "number": 5,
+                "state": "open",
+                "description": "Scope",
+            },
+            "labels": [],
+            "assignees": [],
+        }
+    ]
+    layout = ensure_layout(tmp_path)
+
+    result = import_existing_issues(
+        layout,
+        "acme",
+        "roadmap",
+        client=DummyClient(issues),
+        dry_run=False,
+    )
+
+    assert result.issues_created == 1
+    issue_path = layout.milestones_dir / "stage-1" / "issues" / "20260127-finished-work.md"
+    assert issue_path.exists()
+    issue = load_issue_document(issue_path)
+    assert issue.state is not None
+    assert issue.state.value == "closed"
+    assert issue.milestone == "Stage 1"
 
 
 def test_import_creates_closed_milestone_in_archive(tmp_path) -> None:
