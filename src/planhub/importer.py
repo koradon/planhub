@@ -55,7 +55,7 @@ def import_existing_issues(
         milestone_title = None
         milestone_dir = None
         issue_state = issue.get("state")
-        if milestone and issue_state != "closed":
+        if milestone:
             milestone_title = milestone.get("title")
             if milestone_title:
                 milestone_dir = ensure_milestone_from_github(layout, milestone, dry_run=dry_run)
@@ -64,7 +64,7 @@ def import_existing_issues(
 
         if number in existing_issues:
             existing_path = existing_issues[number]
-            if milestone_dir is None and milestone and issue_state != "closed":
+            if milestone_dir is None and milestone:
                 milestone_title = milestone.get("title")
                 if milestone_title:
                     milestone_dir = ensure_milestone_from_github(layout, milestone, dry_run=dry_run)
@@ -81,7 +81,7 @@ def import_existing_issues(
                 existing_path = existing_by_content[content_key]
                 if not dry_run:
                     update_front_matter(existing_path, {"number": number})
-                if milestone_dir is None and milestone and issue_state != "closed":
+                if milestone_dir is None and milestone:
                     milestone_title = milestone.get("title")
                     if milestone_title:
                         milestone_dir = ensure_milestone_from_github(
@@ -95,9 +95,14 @@ def import_existing_issues(
                     issues_skipped += 1
                 continue
 
-        # Only create files for open issues. Closed issues should not be created
-        # in the file system. If a closed issue is reopened, it will be imported.
-        if issue_state != "open":
+        # Import open issues always. Import closed issues only when they belong
+        # to a milestone (they live inside the milestone folder). Skip closed
+        # backlog/root issues — those are archived/deleted by closed-issue policy
+        # and are not mirrored into .plan/issues.
+        should_import = issue_state == "open" or (
+            issue_state == "closed" and milestone_dir is not None
+        )
+        if not should_import:
             issues_skipped += 1
             continue
 

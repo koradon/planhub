@@ -57,8 +57,8 @@ Without this setup step, sync defaults and other CLI behavior may be missing.
     `remote.origin.url` are available.
   - Imports all GitHub milestones into `.plan/` (including open milestones with
     only closed issues, empty milestones, and closed milestones under
-    `.plan/archive/milestones`). Closed issues themselves are not imported as
-    files.
+    `.plan/archive/milestones`). Closed milestone issues are imported into the
+    milestone folder; closed backlog/root issues are not imported as files.
   - Prints explicit operation counts for import/create/update/archive/delete.
   - Writes the GitHub `number` back into each file after creation.
   - GitHub is the source of truth for issue state during sync.
