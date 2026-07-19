@@ -119,7 +119,12 @@ def reconcile_milestone_states_from_github(
     errors: list[str],
     dry_run: bool,
 ) -> int:
-    """Reconcile local milestone.md fields from GitHub milestone state."""
+    """Reconcile local milestone.md fields from GitHub milestone state.
+
+    Creates missing local milestone directories for every GitHub milestone
+    (including open milestones with only closed issues, empty milestones, and
+    closed milestones). Existing local files are updated in place.
+    """
     updated_count = 0
     try:
         milestones = client.list_milestones(owner, repo, state="all")
@@ -135,6 +140,9 @@ def reconcile_milestone_states_from_github(
             continue
         milestone_dir = find_milestone_dir_by_number(layout, number)
         if milestone_dir is None:
+            ensured = ensure_milestone_from_github(layout, milestone, dry_run=dry_run)
+            if ensured is not None:
+                updated_count += 1
             continue
         milestone_path = milestone_dir / "milestone.md"
         if not milestone_path.exists():
