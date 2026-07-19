@@ -1,6 +1,9 @@
 # Milestone File Format
 
-Each milestone is a standalone markdown file under `milestones/`.
+Each milestone is a `milestone.md` file under
+`.plan/milestones/<slug>/` (or `.plan/archive/milestones/<slug>/` when closed).
+
+Behavior contract: [issue and milestone documents](specs/20260719-issue-and-milestone-documents.md).
 
 ## Front Matter
 Use YAML front matter to store metadata. The sync tool will map these fields to
@@ -25,3 +28,10 @@ The markdown body can include scope, acceptance criteria, or notes.
   and `due_on`.
 - `number` is the canonical identity after creation; it should be recorded
   once available to keep sync stable.
+- During sync, GitHub is the source of truth for milestone `state`; closed
+  milestone directories are moved as a whole under `.plan/archive/milestones`.
+
+## Related
+
+- Spec: [GitHub sync](specs/20260719-github-sync.md)
+- ADR: [0004 archive closed artifacts by policy](adr/0004-archive-closed-artifacts-by-policy.md)
