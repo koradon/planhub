@@ -59,33 +59,45 @@ Without this setup step, sync defaults and other CLI behavior may be missing.
 - `planhub issue <title>`
   - Creates a new GitHub issue with the given title.
   - Requires credentials and a GitHub `remote.origin.url`.
-- `planhub sync`
-  - Reads `.plan/` files and creates or updates GitHub issues and milestones.
-  - Imports existing GitHub issues into `.plan/` when credentials and a GitHub
-    `remote.origin.url` are available.
+- `planhub pull`
+  - Imports GitHub issues and milestones into `.plan/`. Never writes to GitHub.
   - Imports all GitHub milestones into `.plan/` (including open milestones with
     only closed issues, empty milestones, and closed milestones under
     `.plan/archive/milestones`). Closed milestone issues are imported into the
     milestone folder; closed backlog/root issues are not imported as files.
-  - Prints explicit operation counts for import/create/update/archive/delete.
+  - GitHub is also the source of truth for milestone `state`; local milestone
+    files are reconciled from GitHub before archive moves run.
+  - Use `--force` to overwrite an already-imported local issue file's
+    title/body/labels/assignees/milestone/state from its current GitHub
+    content. Local-only front matter keys (e.g. `id`) are preserved. Without
+    `--force`, an already-imported issue's content is left untouched.
+  - Use `--dry-run` to preview imports/overwrites without writing changes.
+  - Requires credentials and a GitHub `remote.origin.url` to import; without
+    them, pull still runs local reconcile and exits 0.
+- `planhub push`
+  - Reads `.plan/` files and creates or updates GitHub issues and milestones.
+    Never imports from GitHub.
+  - Prints explicit operation counts for create/update/archive/delete.
   - Writes the GitHub `number` back into each file after creation.
-  - GitHub is the source of truth for issue state during sync.
-  - GitHub is also the source of truth for milestone `state` during sync; local
-    milestone files are reconciled from GitHub before archive moves run.
-  - For existing issues, sync does not push local `state` or `state_reason` to
-    GitHub; it reconciles those fields from the GitHub response.
-  - Sync runs in three phases: parse files, build a sync plan, then apply it.
+  - GitHub is the source of truth for issue state during push; push does not
+    send local `state` or `state_reason` to GitHub, it reconciles those
+    fields from the GitHub response.
+  - Push runs in three phases: parse files, build a sync plan, then apply it.
   - Use `--dry-run` to validate files without writing changes.
   - Use `--verbose` for path-level planned changes, or `--compact` for concise
     output. CLI flags override config.
-  - Creating issues or milestones also requires credentials and a GitHub
-    `remote.origin.url`.
+  - Requires credentials and a GitHub `remote.origin.url` only when there are
+    pending creates/updates; exits non-zero in that case if missing.
   - Closed synced root issues are archived under `.plan/archive/issues` by
     default (or deleted when `sync.closed_issues.policy: delete` is configured).
   - Milestone issues remain inside their milestone folder. When
-    `milestone.md` has `state: "closed"`, sync moves the whole milestone
+    `milestone.md` has `state: "closed"`, push moves the whole milestone
     directory to `.plan/archive/milestones`. If set back to `state: "open"`,
-    sync moves that directory back under `.plan/milestones`.
+    push moves that directory back under `.plan/milestones`.
+- `planhub sync`
+  - Runs `planhub pull` then `planhub push` — the same combined behavior as
+    before `pull`/`push` existed as separate commands.
+  - Use `--dry-run`, `--verbose`, or `--compact` as with `push`.
 
 ## Credentials
 Planhub can reuse your GitHub CLI session or a token stored in the environment.

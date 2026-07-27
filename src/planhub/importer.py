@@ -9,8 +9,10 @@ from typing import Any
 from planhub.documents import (
     DocumentError,
     IssueDocument,
+    issue_document_to_metadata,
     load_issue_document,
     render_markdown,
+    rewrite_document,
     update_front_matter,
 )
 from planhub.layout import PlanLayout, discover_all_milestones, discover_root_issues
@@ -24,6 +26,7 @@ class ImportResult:
     issues_moved: int
     milestones_created: int
     issues_skipped: int
+    issues_overwritten: int = 0
 
 
 def import_existing_issues(
@@ -33,10 +36,12 @@ def import_existing_issues(
     *,
     client: Any,
     dry_run: bool,
+    force: bool = False,
 ) -> ImportResult:
     issues = client.list_issues(owner, repo, state="all")
     issues_created = 0
     issues_moved = 0
+    issues_overwritten = 0
     milestones_created = 0
     issues_skipped = 0
     existing_issues = _collect_existing_issues(layout)
@@ -70,9 +75,18 @@ def import_existing_issues(
                     milestone_dir = ensure_milestone_from_github(layout, milestone, dry_run=dry_run)
                     if milestone_dir and milestone_dir[1]:
                         milestones_created += 1
-            if _maybe_move_issue(existing_path, milestone_dir, dry_run=dry_run):
+            moved_path = _maybe_move_issue(existing_path, milestone_dir, dry_run=dry_run)
+            did_move = moved_path is not None
+            if did_move:
                 issues_moved += 1
-            else:
+                if not dry_run:
+                    existing_path = moved_path
+            did_overwrite = force and _overwrite_issue_from_github(
+                existing_path, issue, milestone_title=milestone_title, dry_run=dry_run
+            )
+            if did_overwrite:
+                issues_overwritten += 1
+            if not did_move and not did_overwrite:
                 issues_skipped += 1
             continue
         if (issue.get("title") or "") and issue.get("body") is not None:
@@ -89,7 +103,7 @@ def import_existing_issues(
                         )
                         if milestone_dir and milestone_dir[1]:
                             milestones_created += 1
-                if _maybe_move_issue(existing_path, milestone_dir, dry_run=dry_run):
+                if _maybe_move_issue(existing_path, milestone_dir, dry_run=dry_run) is not None:
                     issues_moved += 1
                 else:
                     issues_skipped += 1
@@ -122,6 +136,7 @@ def import_existing_issues(
         issues_moved=issues_moved,
         milestones_created=milestones_created,
         issues_skipped=issues_skipped,
+        issues_overwritten=issues_overwritten,
     )
 
 
@@ -130,17 +145,50 @@ def _maybe_move_issue(
     milestone_dir: tuple[Path, bool] | None,
     *,
     dry_run: bool,
-) -> bool:
+) -> Path | None:
+    """Move an already-imported issue file to its milestone dir, if needed.
+
+    Returns the new path when a move happened (or, under `dry_run`, would
+    happen), or None when no move was needed. Under `dry_run` the file is
+    NOT actually moved, even though a path is returned.
+    """
     if milestone_dir is None:
-        return False
+        return None
     target_dir = milestone_dir[0]
     target_path = target_dir / existing_path.name
     if existing_path == target_path or target_path.exists():
-        return False
+        return None
     if not dry_run:
         target_dir.mkdir(parents=True, exist_ok=True)
         existing_path.rename(target_path)
-    return True
+    return target_path
+
+
+def _overwrite_issue_from_github(
+    path: Path,
+    issue: Mapping[str, Any],
+    *,
+    milestone_title: str | None,
+    dry_run: bool,
+) -> bool:
+    """Rewrite an already-imported issue file's title/body/labels/etc. from GitHub.
+
+    Local-only front matter (like `id`) survives via `rewrite_document`'s merge.
+    Returns whether the file would change (or changed), without writing when
+    `dry_run` is set.
+    """
+    doc = _issue_document_from_api(issue, path, milestone_title=milestone_title)
+    updates = issue_document_to_metadata(doc)
+    if dry_run:
+        try:
+            existing_doc = load_issue_document(path)
+        except DocumentError:
+            return True
+        existing_metadata = issue_document_to_metadata(existing_doc)
+        merged = dict(existing_metadata)
+        merged.update(updates)
+        return merged != existing_metadata or doc.body != existing_doc.body
+    return rewrite_document(path, updates, doc.body)
 
 
 def _collect_existing_issues(layout: PlanLayout) -> dict[int, Path]:

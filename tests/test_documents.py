@@ -4,6 +4,7 @@ from planhub.documents import (
     DocumentError,
     load_issue_document,
     load_milestone_document,
+    rewrite_document,
     update_front_matter,
 )
 from planhub.github import IssueState, IssueStateReason
@@ -113,6 +114,54 @@ def test_update_front_matter_returns_false_for_noop_update(tmp_path) -> None:
 
     original = issue_path.read_text(encoding="utf-8")
     changed = update_front_matter(issue_path, {"number": 42})
+
+    assert changed is False
+    assert issue_path.read_text(encoding="utf-8") == original
+
+
+def test_rewrite_document_merges_front_matter_and_replaces_body(tmp_path) -> None:
+    issue_path = tmp_path / "issue.md"
+    issue_path.write_text(
+        "\n".join(
+            [
+                "---",
+                'title: "Stale title"',
+                'id: "local-only"',
+                "number: 42",
+                "---",
+                "",
+                "Stale body.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    changed = rewrite_document(issue_path, {"title": "Fresh title"}, "Fresh body.")
+
+    issue = load_issue_document(issue_path)
+    assert changed is True
+    assert issue.title == "Fresh title"
+    assert issue.issue_id == "local-only"
+    assert issue.body == "Fresh body."
+
+
+def test_rewrite_document_returns_false_for_noop(tmp_path) -> None:
+    issue_path = tmp_path / "issue.md"
+    issue_path.write_text(
+        "\n".join(
+            [
+                "---",
+                'title: "Ship it"',
+                "---",
+                "",
+                "Body text.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    original = issue_path.read_text(encoding="utf-8")
+    changed = rewrite_document(issue_path, {"title": "Ship it"}, "Body text.")
 
     assert changed is False
     assert issue_path.read_text(encoding="utf-8") == original

@@ -24,13 +24,14 @@ The roadmap holds future initiatives without committing to exact dates.
 
 ## Later
 
-- [Pull and push commands](../ideas/20260719-pull-and-push-commands.md) (`.plan` issue #9).
+(none currently)
 
 ## Shipped (documented)
 
-Core CLI, sync, layered config, archive policies, state reconciliation, and
-the `planhub init` agent skills install/update flow are documented under
-`docs/specs/` and `docs/adr/`. See [docs/README.md](../README.md).
+Core CLI, sync, layered config, archive policies, state reconciliation, the
+`planhub init` agent skills install/update flow, and the `pull`/`push`/`sync`
+command split are documented under `docs/specs/` and `docs/adr/`. See
+[docs/README.md](../README.md).
 
 If the project needs more detailed horizon pages, add them under `docs/roadmap/`
 using `docs/llm/templates/roadmap.md`.
