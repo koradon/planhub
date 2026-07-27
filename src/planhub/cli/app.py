@@ -12,8 +12,13 @@ def init_entry(
     dry_run: bool = typer.Option(
         False, "--dry-run", help="Show what would change without writing."
     ),
+    skills: bool | None = typer.Option(
+        None,
+        "--skills/--no-skills",
+        help="Install Claude/Cursor skills for .plan/ authoring. Omitted: you'll be asked.",
+    ),
 ) -> None:
-    init_command(dry_run=dry_run)
+    init_command(dry_run=dry_run, skills=skills)
 
 
 @app.command("setup")

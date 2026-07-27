@@ -33,7 +33,7 @@ def test_init_command_non_dry_run_calls_config_initializers(
     mock_ensure_repo.return_value = False
     monkeypatch.chdir(tmp_path)
 
-    init_command(dry_run=False)
+    init_command(dry_run=False, skills=False)
 
     mock_ensure_global.assert_called_once_with()
     mock_ensure_repo.assert_called_once_with(tmp_path)
@@ -41,6 +41,96 @@ def test_init_command_non_dry_run_calls_config_initializers(
     assert "Plan layout ready" in printed
     assert "Global config: created" in printed
     assert "Repository config: already exists" in printed
+
+
+@patch("planhub.cli.commands.init.typer.echo")
+def test_init_command_dry_run_lists_skill_paths(mock_echo, tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    init_command(dry_run=True)
+
+    printed = "\n".join(call.args[0] for call in mock_echo.call_args_list)
+    assert str(tmp_path / ".claude" / "skills" / "planhub-plan-artifacts" / "SKILL.md") in printed
+    assert str(tmp_path / ".cursor" / "skills" / "planhub-plan-artifacts" / "SKILL.md") in printed
+
+
+@patch("planhub.cli.commands.init.typer.confirm")
+@patch("planhub.cli.commands.init.install_skills")
+def test_init_command_skills_flag_installs_without_prompting(
+    mock_install, mock_confirm, tmp_path, monkeypatch
+) -> None:
+    from planhub.skills import SkillInstallResult
+
+    mock_install.return_value = SkillInstallResult(created=(), updated=(), unchanged=())
+    monkeypatch.chdir(tmp_path)
+
+    init_command(dry_run=False, skills=True)
+
+    mock_install.assert_called_once_with(tmp_path)
+    mock_confirm.assert_not_called()
+
+
+@patch("planhub.cli.commands.init.typer.confirm")
+@patch("planhub.cli.commands.init.install_skills")
+def test_init_command_no_skills_flag_skips_without_prompting(
+    mock_install, mock_confirm, tmp_path, monkeypatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    init_command(dry_run=False, skills=False)
+
+    mock_install.assert_not_called()
+    mock_confirm.assert_not_called()
+
+
+@patch("planhub.cli.commands.init.sys.stdin")
+@patch("planhub.cli.commands.init.typer.confirm")
+@patch("planhub.cli.commands.init.install_skills")
+def test_init_command_omitted_flag_non_tty_skips_without_prompting(
+    mock_install, mock_confirm, mock_stdin, tmp_path, monkeypatch
+) -> None:
+    mock_stdin.isatty.return_value = False
+    monkeypatch.chdir(tmp_path)
+
+    init_command(dry_run=False, skills=None)
+
+    mock_install.assert_not_called()
+    mock_confirm.assert_not_called()
+
+
+@patch("planhub.cli.commands.init.sys.stdin")
+@patch("planhub.cli.commands.init.typer.confirm")
+@patch("planhub.cli.commands.init.install_skills")
+def test_init_command_omitted_flag_tty_confirmed_installs(
+    mock_install, mock_confirm, mock_stdin, tmp_path, monkeypatch
+) -> None:
+    from planhub.skills import SkillInstallResult
+
+    mock_stdin.isatty.return_value = True
+    mock_confirm.return_value = True
+    mock_install.return_value = SkillInstallResult(created=(), updated=(), unchanged=())
+    monkeypatch.chdir(tmp_path)
+
+    init_command(dry_run=False, skills=None)
+
+    mock_confirm.assert_called_once()
+    mock_install.assert_called_once_with(tmp_path)
+
+
+@patch("planhub.cli.commands.init.sys.stdin")
+@patch("planhub.cli.commands.init.typer.confirm")
+@patch("planhub.cli.commands.init.install_skills")
+def test_init_command_omitted_flag_tty_declined_skips(
+    mock_install, mock_confirm, mock_stdin, tmp_path, monkeypatch
+) -> None:
+    mock_stdin.isatty.return_value = True
+    mock_confirm.return_value = False
+    monkeypatch.chdir(tmp_path)
+
+    init_command(dry_run=False, skills=None)
+
+    mock_confirm.assert_called_once()
+    mock_install.assert_not_called()
 
 
 @patch("planhub.cli.commands.setup.typer.echo")

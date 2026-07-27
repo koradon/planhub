@@ -45,6 +45,14 @@ Without this setup step, sync defaults and other CLI behavior may be missing.
 - `planhub init`
   - Creates the standard `.plan/` structure in the current repo.
   - Use `--dry-run` to preview the folders that would be created.
+  - Offers to install a `planhub-plan-artifacts` skill for Claude Code and
+    Cursor (`.claude/skills/` and `.cursor/skills/`) that teaches the agent
+    `.plan/` layout, front matter, and to never run `planhub sync` unasked.
+  - Use `--skills` to install/update without prompting, or `--no-skills` to
+    skip without prompting. Omit both to be asked (interactive shells only —
+    non-interactive runs skip by default).
+  - Re-running `planhub init --skills` refreshes any installed skill file
+    whose content is out of date with the bundled template.
 - `planhub setup`
   - Creates the global config file at `~/.planhub/config.yaml` (if missing).
   - Use `--dry-run` to preview what would be created.
