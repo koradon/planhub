@@ -21,9 +21,12 @@ issue import); the second half only reads local files and writes GitHub
 ## Decision
 
 Split the pipeline into `planhub pull` and `planhub push`, and keep
-`planhub sync` as a wrapper that runs `pull` then `push` with identical
-observable behavior to before the split (ADR-0005's three phases still
-describe the inside of `push`).
+`planhub sync` as a wrapper that runs `pull` then `push` with the same
+behavior and exit codes as before the split (ADR-0005's three phases still
+describe the inside of `push`). `sync` reuses `pull`'s summary line, so its
+printed Import line now includes the `overwrite N,` segment `pull --force`
+introduces; for `sync` this always reads `overwrite 0,` since `sync` never
+passes `--force`.
 
 - `push` keeps the full write phase — create *and* update issues/milestones,
   plus the local closed-issue archive step — not just creates. Otherwise
@@ -48,8 +51,9 @@ describe the inside of `push`).
 
 ## Consequences
 
-- Two new CLI commands, plus one new flag; `sync`'s behavior, output, and
-  exit codes are unchanged.
+- Two new CLI commands, plus one new flag; `sync`'s behavior and exit codes
+  are unchanged. Its printed output gains the `overwrite N,` segment now
+  shared with `pull`'s summary line (always `overwrite 0,` for `sync`).
 - `src/planhub/cli/commands/sync/pull.py` and `.../push.py` hold the two
   phases; `src/planhub/cli/commands/sync/__init__.py` composes them into
   `pull_command`, `push_command`, and `sync_command`.

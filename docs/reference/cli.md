@@ -65,8 +65,10 @@ still runs the local archive step and succeeds without credentials.
 ### `planhub sync`
 
 Runs `planhub pull` then `planhub push`, printing both phases' summaries.
-Behavior, output, and exit codes are unchanged from before the pull/push
-split.
+Behavior and exit codes are unchanged from before the pull/push split. Output
+is unchanged except that the Import line now includes `pull`'s
+`overwrite N,` segment, which always reads `overwrite 0,` here since `sync`
+never passes `--force`.
 
 | Option | Description |
 | --- | --- |

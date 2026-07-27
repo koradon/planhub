@@ -18,7 +18,8 @@ Implements the ADR: split `planhub sync`'s existing pipeline into
 `.../push.py` (`.plan/` → GitHub), add `planhub pull`/`planhub push` CLI
 commands, and add `pull --force` for overwriting already-imported local issue
 content from GitHub. `sync` keeps running `pull` then `push` with unchanged
-output and exit codes.
+behavior and exit codes; its Import line now also carries the `overwrite N,`
+segment shared with `pull`'s summary (always `0` for `sync`).
 
 ## Steps
 
