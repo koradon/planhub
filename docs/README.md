@@ -24,7 +24,7 @@ This repository uses a docs-as-code layout bootstrapped by [adrlane](https://git
 | [Issue and milestone documents](specs/20260719-issue-and-milestone-documents.md) | [ISSUE_FORMAT](ISSUE_FORMAT.md), [MILESTONE_FORMAT](MILESTONE_FORMAT.md) |
 | [Layered configuration](specs/20260719-layered-configuration.md) | [ADR-0003](adr/0003-layered-configuration.md) |
 | [Create issue command](specs/20260719-create-issue-command.md) | [CLI foundation plan](plans/20260127-cli-foundation.completed.md) |
-| [Plan artifact agent skills](specs/20260727-plan-artifact-agent-skills.md) | [Plan artifact agent skills plan](plans/20260727-plan-artifact-agent-skills.md) |
+| [Plan artifact agent skills](specs/20260727-plan-artifact-agent-skills.md) | [Plan artifact agent skills plan](plans/20260727-plan-artifact-agent-skills.completed.md) |
 
 Format/layout contracts also live as long-form reference:
 
@@ -37,6 +37,7 @@ Completed implementation plans:
 
 - [CLI foundation](plans/20260127-cli-foundation.completed.md)
 - [Config and sync hardening](plans/20260327-config-sync-hardening.completed.md)
+- [Plan artifact agent skills](plans/20260727-plan-artifact-agent-skills.completed.md)
 
 ## How this documentation grows
 

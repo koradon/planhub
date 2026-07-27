@@ -23,7 +23,6 @@ Copy and adapt `docs/llm/templates/idea.md`.
 
 - [Pull and push commands](20260719-pull-and-push-commands.md)
 - [Interactive config prompts](20260719-interactive-config-prompts.md)
-- [AI rules for planning artifacts](20260719-ai-rules-for-planning-artifacts.md)
 - [Init welcome templates](20260719-init-welcome-templates.md)
 
 ## How to stay agnostic

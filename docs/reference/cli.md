@@ -22,11 +22,16 @@ Create `~/.planhub/config.yaml` if missing.
 ### `planhub init`
 
 Create `.plan/issues` and `.plan/milestones`, and ensure global + repo config
-files exist (without overwriting).
+files exist (without overwriting). Also offers to install/update the bundled
+`planhub-plan-artifacts` Claude Code / Cursor skill.
 
 | Option | Description |
 | --- | --- |
-| `--dry-run` | Preview paths; do not write |
+| `--dry-run` | Preview paths; do not write or prompt |
+| `--skills` / `--no-skills` | Install/update or skip the skill files; never prompts. Omitted: prompts on a TTY, skips otherwise |
+
+See [plan artifact agent skills](../specs/20260727-plan-artifact-agent-skills.md)
+for the install/update decision flow and skill content.
 
 ### `planhub sync`
 
@@ -51,6 +56,7 @@ Requires credentials and a GitHub `remote.origin.url`.
 ## Related
 
 - Spec: [plan layout and init](../specs/20260719-plan-layout-and-init.md)
+- Spec: [plan artifact agent skills](../specs/20260727-plan-artifact-agent-skills.md)
 - Spec: [GitHub sync](../specs/20260719-github-sync.md)
 - Spec: [create issue command](../specs/20260719-create-issue-command.md)
 - Spec: [layered configuration](../specs/20260719-layered-configuration.md)

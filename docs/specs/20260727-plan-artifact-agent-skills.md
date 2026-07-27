@@ -93,7 +93,7 @@ See `docs/specs/features/20260727-plan-artifact-agent-skills.feature`.
 - Idea: [AI rules for planning artifacts](../ideas/20260719-ai-rules-for-planning-artifacts.md)
 - Spec: [plan layout and init](20260719-plan-layout-and-init.md)
 - Reference: [ISSUE_FORMAT.md](../ISSUE_FORMAT.md), [MILESTONE_FORMAT.md](../MILESTONE_FORMAT.md), [REPO_LAYOUT.md](../REPO_LAYOUT.md)
-- Active plan: [plan artifact agent skills](../plans/20260727-plan-artifact-agent-skills.md)
+- Plan: [plan artifact agent skills](../plans/20260727-plan-artifact-agent-skills.completed.md)
 - Acceptance: `docs/specs/features/20260727-plan-artifact-agent-skills.feature`
 
 ## Open Questions
