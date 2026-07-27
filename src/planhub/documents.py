@@ -127,6 +127,25 @@ def update_front_matter(
     return True
 
 
+def rewrite_document(path: Path, updates: Mapping[str, Any], body: str) -> bool:
+    """Merge front matter updates and replace the body in one write.
+
+    Unlike `update_front_matter`, this also replaces the body. Front matter
+    keys not present in `updates` are preserved (e.g. a local-only `id` or
+    `type`), which is what makes a forced overwrite non-destructive to fields
+    GitHub knows nothing about.
+
+    Returns False (and skips the write) when nothing would change.
+    """
+    metadata, existing_body = _parse_front_matter(path, path.read_text(encoding="utf-8"))
+    merged = dict(metadata)
+    merged.update(updates)
+    if merged == metadata and body == existing_body:
+        return False
+    path.write_text(render_markdown(merged, body), encoding="utf-8")
+    return True
+
+
 def render_markdown(front_matter: Mapping[str, Any], body: str) -> str:
     yaml_text = yaml.safe_dump(front_matter, sort_keys=False).strip()
     sections = ["---", yaml_text, "---", ""]

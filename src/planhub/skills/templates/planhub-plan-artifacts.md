@@ -4,7 +4,7 @@ description: >-
   Use when creating or editing files under .plan/ (issues, milestones) in this
   repository, or when asked to plan work, file an issue, or set up a
   milestone. Covers required front matter, file layout, naming, and when
-  (and when not) to run `planhub sync`.
+  (and when not) to run `planhub pull`, `planhub push`, or `planhub sync`.
 ---
 
 # Planning artifacts (Planhub)
@@ -17,7 +17,7 @@ GitHub Issues and Milestones by [Planhub](https://github.com/your-org/planhub).
 - `.plan/issues/YYYYMMDD-title.md` — backlog issues, not tied to a milestone.
 - `.plan/milestones/<slug>/milestone.md` — one file per milestone.
 - `.plan/milestones/<slug>/issues/*.md` — issues that belong to that milestone.
-- `.plan/archive/` — closed items moved here by `planhub sync`. Don't hand-edit archive contents.
+- `.plan/archive/` — closed items moved here by `planhub push` (or `sync`). Don't hand-edit archive contents.
 
 ## Issue front matter
 
@@ -54,11 +54,17 @@ state: "open"
 
 - Fill in `id` and body content for new files; leave `number` blank until sync assigns it.
 - For issues/milestones that already have a `number`, don't hand-edit `state` or
-  `state_reason` - sync reconciles those from GitHub and will overwrite local edits.
+  `state_reason` - sync/pull reconciles those from GitHub and will overwrite local edits.
 - Use `labels: []` / `assignees: []` to clear a list, `milestone: null` to unset.
 
-## Do not auto-run sync
+## Do not auto-run pull, push, or sync
 
 Creating or editing files under `.plan/` is safe on its own. Never run
-`planhub sync` on the user's behalf unless they explicitly ask for it in this
-conversation - sync pushes real changes to GitHub Issues and Milestones.
+`planhub pull`, `planhub push`, or `planhub sync` on the user's behalf unless
+they explicitly ask for it in this conversation:
+
+- `planhub push` (and the push half of `sync`) writes real changes to GitHub
+  Issues and Milestones.
+- `planhub pull` only writes to local files, but `pull --force` overwrites an
+  already-imported issue file's title/body with its current GitHub content,
+  discarding uncommitted local edits to that file.

@@ -2,9 +2,26 @@ from __future__ import annotations
 
 import typer
 
-from planhub.cli.commands import init_command, issue_command, setup_command, sync_command
+from planhub.cli.commands import (
+    init_command,
+    issue_command,
+    pull_command,
+    push_command,
+    setup_command,
+    sync_command,
+)
 
 app = typer.Typer(help="Planhub CLI.")
+
+
+def _resolve_verbosity_override(*, verbose: bool, compact: bool) -> str | None:
+    if verbose and compact:
+        raise typer.BadParameter("Use either --verbose or --compact, not both.")
+    if verbose:
+        return "verbose"
+    if compact:
+        return "compact"
+    return None
 
 
 @app.command("init")
@@ -30,6 +47,35 @@ def setup_entry(
     setup_command(dry_run=dry_run)
 
 
+@app.command("pull")
+def pull_entry(
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Show what would change without writing."
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="Overwrite existing local issue files with their current GitHub content.",
+    ),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show detailed pull output."),
+    compact: bool = typer.Option(False, "--compact", help="Force compact pull output."),
+) -> None:
+    verbosity_override = _resolve_verbosity_override(verbose=verbose, compact=compact)
+    pull_command(dry_run=dry_run, force=force, verbosity_override=verbosity_override)
+
+
+@app.command("push")
+def push_entry(
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Show what would change without writing."
+    ),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show detailed push output."),
+    compact: bool = typer.Option(False, "--compact", help="Force compact push output."),
+) -> None:
+    verbosity_override = _resolve_verbosity_override(verbose=verbose, compact=compact)
+    push_command(dry_run=dry_run, verbosity_override=verbosity_override)
+
+
 @app.command("sync")
 def sync_entry(
     dry_run: bool = typer.Option(
@@ -38,13 +84,7 @@ def sync_entry(
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Show detailed sync output."),
     compact: bool = typer.Option(False, "--compact", help="Force compact sync output."),
 ) -> None:
-    verbosity_override: str | None = None
-    if verbose and compact:
-        raise typer.BadParameter("Use either --verbose or --compact, not both.")
-    if verbose:
-        verbosity_override = "verbose"
-    if compact:
-        verbosity_override = "compact"
+    verbosity_override = _resolve_verbosity_override(verbose=verbose, compact=compact)
     sync_command(dry_run=dry_run, verbosity_override=verbosity_override)
 
 

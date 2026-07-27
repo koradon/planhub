@@ -356,6 +356,154 @@ def test_import_uses_existing_archived_milestone_instead_of_creating_active_dupl
     assert (archived_milestone / "issues" / "20260127-another-issue.md").exists()
 
 
+def test_import_force_overwrites_existing_issue_content(tmp_path) -> None:
+    issues = [
+        {
+            "number": 4,
+            "title": "Fresh title",
+            "body": "Fresh body",
+            "state": "open",
+            "created_at": "2026-01-27T10:00:00Z",
+            "labels": [{"name": "p1"}],
+            "assignees": [],
+        }
+    ]
+    layout = ensure_layout(tmp_path)
+    layout.issues_dir.mkdir(parents=True, exist_ok=True)
+    (layout.issues_dir / "issue.md").write_text(
+        '---\ntitle: "Stale title"\nid: "local-only"\nnumber: 4\n---\n\nStale body.\n',
+        encoding="utf-8",
+    )
+
+    result = import_existing_issues(
+        layout,
+        "acme",
+        "roadmap",
+        client=DummyClient(issues),
+        dry_run=False,
+        force=True,
+    )
+
+    issue = load_issue_document(layout.issues_dir / "issue.md")
+    assert result.issues_overwritten == 1
+    assert result.issues_moved == 0
+    assert result.issues_skipped == 0
+    assert issue.title == "Fresh title"
+    assert issue.body == "Fresh body"
+    assert issue.labels == ("p1",)
+    assert issue.issue_id == "local-only"
+
+
+def test_import_without_force_skips_existing_issue_content(tmp_path) -> None:
+    issues = [
+        {
+            "number": 4,
+            "title": "Fresh title",
+            "body": "Fresh body",
+            "state": "open",
+            "created_at": "2026-01-27T10:00:00Z",
+            "labels": [],
+            "assignees": [],
+        }
+    ]
+    layout = ensure_layout(tmp_path)
+    layout.issues_dir.mkdir(parents=True, exist_ok=True)
+    (layout.issues_dir / "issue.md").write_text(
+        '---\ntitle: "Stale title"\nnumber: 4\n---\n\nStale body.\n',
+        encoding="utf-8",
+    )
+
+    result = import_existing_issues(
+        layout,
+        "acme",
+        "roadmap",
+        client=DummyClient(issues),
+        dry_run=False,
+    )
+
+    issue = load_issue_document(layout.issues_dir / "issue.md")
+    assert result.issues_overwritten == 0
+    assert result.issues_skipped == 1
+    assert issue.title == "Stale title"
+    assert issue.body == "Stale body."
+
+
+def test_import_force_dry_run_reports_without_writing(tmp_path) -> None:
+    issues = [
+        {
+            "number": 4,
+            "title": "Fresh title",
+            "body": "Fresh body",
+            "state": "open",
+            "created_at": "2026-01-27T10:00:00Z",
+            "labels": [],
+            "assignees": [],
+        }
+    ]
+    layout = ensure_layout(tmp_path)
+    layout.issues_dir.mkdir(parents=True, exist_ok=True)
+    issue_path = layout.issues_dir / "issue.md"
+    issue_path.write_text(
+        '---\ntitle: "Stale title"\nnumber: 4\n---\n\nStale body.\n',
+        encoding="utf-8",
+    )
+    original = issue_path.read_text(encoding="utf-8")
+
+    result = import_existing_issues(
+        layout,
+        "acme",
+        "roadmap",
+        client=DummyClient(issues),
+        dry_run=True,
+        force=True,
+    )
+
+    assert result.issues_overwritten == 1
+    assert issue_path.read_text(encoding="utf-8") == original
+
+
+def test_import_force_overwrites_after_milestone_move(tmp_path) -> None:
+    issues = [
+        {
+            "number": 4,
+            "title": "Fresh title",
+            "body": "Fresh body",
+            "state": "open",
+            "created_at": "2026-01-27T10:00:00Z",
+            "milestone": {
+                "title": "Stage 1",
+                "number": 5,
+                "state": "open",
+                "description": "Scope",
+            },
+            "labels": [],
+            "assignees": [],
+        }
+    ]
+    layout = ensure_layout(tmp_path)
+    layout.issues_dir.mkdir(parents=True, exist_ok=True)
+    (layout.issues_dir / "issue.md").write_text(
+        '---\ntitle: "Stale title"\nnumber: 4\n---\n\nStale body.\n',
+        encoding="utf-8",
+    )
+
+    result = import_existing_issues(
+        layout,
+        "acme",
+        "roadmap",
+        client=DummyClient(issues),
+        dry_run=False,
+        force=True,
+    )
+
+    moved_path = layout.milestones_dir / "stage-1" / "issues" / "issue.md"
+    issue = load_issue_document(moved_path)
+    assert result.issues_moved == 1
+    assert result.issues_overwritten == 1
+    assert issue.title == "Fresh title"
+    assert issue.body == "Fresh body"
+
+
 def test_import_creates_reopened_issues(tmp_path) -> None:
     issues = [
         {

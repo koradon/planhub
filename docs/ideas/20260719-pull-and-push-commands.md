@@ -2,7 +2,8 @@
 
 ## Status
 
-draft
+promoted — see [GitHub sync spec](../specs/20260719-github-sync.md) and
+[ADR-0006](../adr/0006-directional-pull-and-push-commands.md).
 
 ## Summary
 

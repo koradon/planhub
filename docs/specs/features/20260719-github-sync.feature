@@ -37,3 +37,32 @@ Feature: GitHub sync
     When the user runs `planhub sync`
     Then the directory is moved to `.plan/archive/milestones/<slug>`
     And milestone issues remain inside that directory
+
+  Scenario: Pull imports GitHub issues without writing to GitHub
+    Given an initialized `.plan` layout with no local issues
+    And valid GitHub credentials
+    And an open GitHub issue not yet present locally
+    When the user runs `planhub pull`
+    Then a local issue file is created from the GitHub issue
+    And no GitHub issue is created or updated
+
+  Scenario: Push writes local changes without importing from GitHub
+    Given a local root issue file without `number`
+    And valid GitHub credentials for the repository remote
+    When the user runs `planhub push`
+    Then a GitHub issue is created from the local title and body
+    And the local front matter gains the GitHub `number`
+    And GitHub issues are never listed for import
+
+  Scenario: Pull --force overwrites stale local content
+    Given a synced local issue file with a stale title and body
+    And the matching GitHub issue has a different title and body
+    When the user runs `planhub pull --force`
+    Then the local title and body are replaced with the GitHub content
+    And local-only front matter keys (e.g. `id`) are preserved
+
+  Scenario: Pull without --force leaves synced content untouched
+    Given a synced local issue file with a stale title and body
+    And the matching GitHub issue has a different title and body
+    When the user runs `planhub pull`
+    Then the local title and body remain unchanged

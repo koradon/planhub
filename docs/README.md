@@ -20,7 +20,7 @@ This repository uses a docs-as-code layout bootstrapped by [adrlane](https://git
 | Spec | ADR / plan anchors |
 | --- | --- |
 | [Plan layout and init](specs/20260719-plan-layout-and-init.md) | [ADR-0001](adr/0001-local-markdown-planning-synced-to-github.md) |
-| [GitHub sync](specs/20260719-github-sync.md) | [ADR-0002](adr/0002-github-source-of-truth-for-state.md), [ADR-0004](adr/0004-archive-closed-artifacts-by-policy.md), [ADR-0005](adr/0005-three-phase-sync-pipeline.md) |
+| [GitHub sync](specs/20260719-github-sync.md) | [ADR-0002](adr/0002-github-source-of-truth-for-state.md), [ADR-0004](adr/0004-archive-closed-artifacts-by-policy.md), [ADR-0005](adr/0005-three-phase-sync-pipeline.md), [ADR-0006](adr/0006-directional-pull-and-push-commands.md) |
 | [Issue and milestone documents](specs/20260719-issue-and-milestone-documents.md) | [ISSUE_FORMAT](ISSUE_FORMAT.md), [MILESTONE_FORMAT](MILESTONE_FORMAT.md) |
 | [Layered configuration](specs/20260719-layered-configuration.md) | [ADR-0003](adr/0003-layered-configuration.md) |
 | [Create issue command](specs/20260719-create-issue-command.md) | [CLI foundation plan](plans/20260127-cli-foundation.completed.md) |
@@ -38,6 +38,7 @@ Completed implementation plans:
 - [CLI foundation](plans/20260127-cli-foundation.completed.md)
 - [Config and sync hardening](plans/20260327-config-sync-hardening.completed.md)
 - [Plan artifact agent skills](plans/20260727-plan-artifact-agent-skills.completed.md)
+- [Pull and push commands](plans/20260727-pull-and-push-commands.completed.md)
 
 ## How this documentation grows
 

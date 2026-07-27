@@ -86,7 +86,7 @@ def test_sync_verbose_lists_planned_changes(
     assert "milestone create" in result.output
 
 
-@patch("planhub.cli.commands.sync.reconcile_milestone_states_from_github")
+@patch("planhub.cli.commands.sync.pull.reconcile_milestone_states_from_github")
 @patch("planhub.cli.commands.sync.get_github_repo_from_git")
 @patch("planhub.cli.commands.sync.get_auth_token")
 @patch("planhub.cli.commands.sync.GitHubClient")
