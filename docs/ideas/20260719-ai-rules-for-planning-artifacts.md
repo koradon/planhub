@@ -2,7 +2,7 @@
 
 ## Status
 
-draft
+accepted
 
 ## Summary
 
@@ -39,6 +39,7 @@ Developers using Cursor/Claude/other agents to maintain `.plan/` content.
 
 - Spec: [issue and milestone documents](../specs/20260719-issue-and-milestone-documents.md)
 - Spec: [plan layout and init](../specs/20260719-plan-layout-and-init.md)
+- Spec: [plan artifact agent skills](../specs/20260727-plan-artifact-agent-skills.md)
 - Idea: [init welcome templates](20260719-init-welcome-templates.md)
 - Roadmap: [Now / Next / Later](../roadmap/README.md)
 - `.plan` issue: #3

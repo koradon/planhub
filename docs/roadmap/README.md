@@ -21,7 +21,6 @@ The roadmap holds future initiatives without committing to exact dates.
 
 - [Init welcome templates](../ideas/20260719-init-welcome-templates.md) (`.plan` issue #2).
 - [Interactive config prompts](../ideas/20260719-interactive-config-prompts.md) (`.plan` issue #26).
-- [AI rules for planning artifacts](../ideas/20260719-ai-rules-for-planning-artifacts.md) (`.plan` issue #3).
 
 ## Later
 
@@ -29,8 +28,9 @@ The roadmap holds future initiatives without committing to exact dates.
 
 ## Shipped (documented)
 
-Core CLI, sync, layered config, archive policies, and state reconciliation are
-documented under `docs/specs/` and `docs/adr/`. See [docs/README.md](../README.md).
+Core CLI, sync, layered config, archive policies, state reconciliation, and
+the `planhub init` agent skills install/update flow are documented under
+`docs/specs/` and `docs/adr/`. See [docs/README.md](../README.md).
 
 If the project needs more detailed horizon pages, add them under `docs/roadmap/`
 using `docs/llm/templates/roadmap.md`.
