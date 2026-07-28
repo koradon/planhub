@@ -2,7 +2,7 @@
 
 ## Status
 
-accepted
+superseded by [0007](0007-repository-only-configuration.md)
 
 ## Context and Problem Statement
 
@@ -33,7 +33,15 @@ repo files exist without overwriting.
 - Bad, because debugging effective config requires understanding merge order.
 - Bad, because interactive onboarding prompts are still missing.
 
+**Superseded:** [ADR-0007](0007-repository-only-configuration.md) drops the
+global layer entirely — a multi-account GitHub workflow makes
+`sync.github.default_assignees` (the strongest case for a global default)
+actively wrong per repo, and the one remaining personal setting
+(`sync.behavior.verbosity`) already has CLI flags. See ADR-0007 for the full
+reasoning.
+
 ## Related
 
 - Spec: [layered configuration](../specs/20260719-layered-configuration.md)
 - Idea: [interactive config prompts](../ideas/20260719-interactive-config-prompts.md)
+- Superseded by: [ADR-0007 repository-only configuration](0007-repository-only-configuration.md)

@@ -2,7 +2,9 @@
 
 ## Status
 
-accepted
+superseded by [interactive config prompts](20260728-interactive-config-prompts.md)
+(see [ADR-0007](../adr/0007-repository-only-configuration.md)) — `planhub
+setup` and `~/.planhub/config.yaml` no longer exist; kept here as history.
 
 ## Summary
 
@@ -57,11 +59,13 @@ See `docs/specs/features/20260719-layered-configuration.feature`.
 
 - Spec: [plan layout and init](20260719-plan-layout-and-init.md)
 - Spec: [GitHub sync](20260719-github-sync.md)
-- ADR: [0003 layered configuration](../adr/0003-layered-configuration.md)
+- ADR: [0003 layered configuration](../adr/0003-layered-configuration.md) (superseded)
 - Plan: [config and sync hardening](../plans/20260327-config-sync-hardening.completed.md)
 - Idea: [interactive config prompts](../ideas/20260719-interactive-config-prompts.md)
 - Acceptance: `docs/specs/features/20260719-layered-configuration.feature`
+- Superseded by: [interactive config prompts](20260728-interactive-config-prompts.md)
 
 ## Open Questions
 
-- Interactive prompts during setup/init are intentionally deferred.
+- Resolved: the global config layer was removed rather than gaining
+  interactive prompts. See [ADR-0007](../adr/0007-repository-only-configuration.md).

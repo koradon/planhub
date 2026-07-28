@@ -2,7 +2,11 @@
 
 ## Status
 
-draft
+accepted — implemented as [interactive config prompts](../specs/20260728-interactive-config-prompts.md).
+The "prompt in both setup and init" option below was rejected: designing the
+prompts surfaced that the global config layer itself didn't hold up (see
+[ADR-0007](../adr/0007-repository-only-configuration.md)), so `planhub setup`
+was removed and `init` is now the only place prompts happen.
 
 ## Summary
 

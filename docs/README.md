@@ -22,9 +22,10 @@ This repository uses a docs-as-code layout bootstrapped by [adrlane](https://git
 | [Plan layout and init](specs/20260719-plan-layout-and-init.md) | [ADR-0001](adr/0001-local-markdown-planning-synced-to-github.md) |
 | [GitHub sync](specs/20260719-github-sync.md) | [ADR-0002](adr/0002-github-source-of-truth-for-state.md), [ADR-0004](adr/0004-archive-closed-artifacts-by-policy.md), [ADR-0005](adr/0005-three-phase-sync-pipeline.md), [ADR-0006](adr/0006-directional-pull-and-push-commands.md) |
 | [Issue and milestone documents](specs/20260719-issue-and-milestone-documents.md) | [ISSUE_FORMAT](ISSUE_FORMAT.md), [MILESTONE_FORMAT](MILESTONE_FORMAT.md) |
-| [Layered configuration](specs/20260719-layered-configuration.md) | [ADR-0003](adr/0003-layered-configuration.md) |
+| [Layered configuration](specs/20260719-layered-configuration.md) (superseded) | [ADR-0003](adr/0003-layered-configuration.md) (superseded) |
 | [Create issue command](specs/20260719-create-issue-command.md) | [CLI foundation plan](plans/20260127-cli-foundation.completed.md) |
 | [Plan artifact agent skills](specs/20260727-plan-artifact-agent-skills.md) | [Plan artifact agent skills plan](plans/20260727-plan-artifact-agent-skills.completed.md) |
+| [Interactive config prompts](specs/20260728-interactive-config-prompts.md) | [ADR-0007](adr/0007-repository-only-configuration.md), [Interactive config prompts plan](plans/20260728-interactive-config-prompts.completed.md) |
 
 Format/layout contracts also live as long-form reference:
 
@@ -39,6 +40,7 @@ Completed implementation plans:
 - [Config and sync hardening](plans/20260327-config-sync-hardening.completed.md)
 - [Plan artifact agent skills](plans/20260727-plan-artifact-agent-skills.completed.md)
 - [Pull and push commands](plans/20260727-pull-and-push-commands.completed.md)
+- [Interactive config prompts](plans/20260728-interactive-config-prompts.completed.md)
 
 ## How this documentation grows
 

@@ -3,18 +3,18 @@ Feature: Plan layout and init
 
   # Related spec: docs/specs/20260719-plan-layout-and-init.md
 
-  Scenario: Init creates the plan layout and default configs
+  Scenario: Init creates the plan layout and default config
     Given a git repository without a .plan directory
-    When the user runs `planhub init`
+    When the user runs `planhub init --yes`
     Then `.plan/issues` and `.plan/milestones` exist
     And `.plan/config.yaml` exists if it was missing
-    And `~/.planhub/config.yaml` exists if it was missing
 
-  Scenario: Init dry-run does not write files
+  Scenario: Init dry-run does not write files or prompt
     Given a git repository without a .plan directory
     When the user runs `planhub init --dry-run`
-    Then the CLI lists the paths that would be created
+    Then the CLI lists the paths and config questions that would be asked
     And no `.plan` directory is created
+    And the user is not prompted
 
   Scenario: Sync requires an initialized layout
     Given a repository without a `.plan` directory
