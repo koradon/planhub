@@ -77,6 +77,11 @@ imports.
 - `documents.py` — Markdown/YAML front-matter parse and render for issues/milestones.
 - `config.py` — repository-only config: built-in defaults merged with `.plan/config.yaml`
   (ADR-0007, supersedes ADR-0003). Validates against a schema, rejects unknown keys.
+  `write_config_values`/`write_repo_config_values` merge-write only the given dotted keys onto
+  the file's existing contents, leaving unrelated keys and its leading comment block untouched.
+- `cli/config_prompts.py` — interactive `planhub init` prompts (`run_config_prompts`,
+  `config_updates_from_answers`, `describe_prompts_dry_run`) for the four sync defaults; see
+  `docs/specs/20260728-interactive-config-prompts.md`.
 - `github.py` — `GitHubClient`, thin wrapper over the REST API (retries, rate-limit handling,
   pagination via `Link` headers).
 - `repository.py` — resolves `owner/repo` from the local git remote (`remote.origin.url`).

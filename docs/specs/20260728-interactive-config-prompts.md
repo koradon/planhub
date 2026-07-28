@@ -88,7 +88,7 @@ See `docs/specs/features/20260728-interactive-config-prompts.feature`.
   (supersedes [0003](../adr/0003-layered-configuration.md))
 - Spec (superseded): [layered configuration](20260719-layered-configuration.md)
 - Spec: [plan layout and init](20260719-plan-layout-and-init.md)
-- Plan: [interactive config prompts](../plans/20260728-interactive-config-prompts.md)
+- Plan: [interactive config prompts](../plans/20260728-interactive-config-prompts.completed.md)
 - Acceptance: `docs/specs/features/20260728-interactive-config-prompts.feature`
 
 ## Open Questions

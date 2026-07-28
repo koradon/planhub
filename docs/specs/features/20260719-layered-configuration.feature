@@ -1,7 +1,11 @@
 Feature: Layered configuration and setup
   Load global and repository config overlays and create defaults on demand.
 
-  # Related spec: docs/specs/20260719-layered-configuration.md
+  # Related spec: docs/specs/20260719-layered-configuration.md (superseded by
+  # docs/specs/20260728-interactive-config-prompts.md — see ADR-0007). The
+  # global config layer and `planhub setup` no longer exist; the three
+  # scenarios below are kept as history, not current behavior. "Unknown
+  # config keys are rejected" is unrelated to layering and still current.
 
   Scenario: Repository config overrides global closed-issue policy
     Given a global config with `sync.closed_issues.policy: archive`
