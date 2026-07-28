@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import os
+import sys
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -70,6 +70,12 @@ def _default_config_data() -> dict[str, Any]:
     }
 
 
+def default_config_data() -> dict[str, Any]:
+    """Public alias for the built-in defaults layer."""
+
+    return _default_config_data()
+
+
 _CONFIG_SCHEMA: Mapping[str, Any] = {
     "sync": {
         "closed_issues": {
@@ -88,11 +94,23 @@ _CONFIG_SCHEMA: Mapping[str, Any] = {
 }
 
 
+def _dump_config_yaml(data: Mapping[str, Any]) -> str:
+    # `sort_keys=False` keeps dict insertion order for stable diffs;
+    # `allow_unicode=True` keeps non-ASCII assignees/labels readable.
+    return yaml.safe_dump(dict(data), sort_keys=False, allow_unicode=True).strip() + "\n"
+
+
 def render_default_config_yaml() -> str:
     """Render default config YAML for users to copy/create."""
 
-    # `sort_keys=False` keeps dict insertion order for stable diffs.
-    return yaml.safe_dump(_default_config_data(), sort_keys=False).strip() + "\n"
+    return _dump_config_yaml(_default_config_data())
+
+
+_REPO_CONFIG_STUB = """\
+# Planhub configuration for this repository.
+# Only keys set here differ from planhub's built-in defaults.
+# Run `planhub init` to set them interactively.
+"""
 
 
 def _write_if_missing(path: Path, content: str) -> bool:
@@ -103,35 +121,33 @@ def _write_if_missing(path: Path, content: str) -> bool:
     return True
 
 
-def ensure_global_config() -> bool:
-    """Ensure `~/.planhub/config.yaml` exists (creates defaults if missing)."""
-
-    return _write_if_missing(_global_config_path(), render_default_config_yaml())
-
-
 def ensure_repo_config(repo_root: Path) -> bool:
-    """Ensure `<repo>/.plan/config.yaml` exists (creates defaults if missing)."""
+    """Ensure `<repo>/.plan/config.yaml` exists (creates a minimal stub if missing).
 
-    repo_root = repo_root.resolve()
-    path = repo_root / ".plan" / "config.yaml"
-    return _write_if_missing(path, render_default_config_yaml())
-
-
-def load_config(repo_root: Path) -> PlanHubConfig:
-    """Load configuration from ~/.planhub/config.yaml and .plan/config.yaml.
-
-    Precedence:
-      built-in defaults < global config < repository config
+    The stub sets no keys, so built-in defaults apply until the project
+    deliberately overrides one.
     """
 
     repo_root = repo_root.resolve()
-    merged = _default_config_data()
+    path = repo_root / ".plan" / "config.yaml"
+    return _write_if_missing(path, _REPO_CONFIG_STUB)
 
-    global_path = _global_config_path()
-    merged = _deep_merge(merged, _load_and_validate_yaml(global_path))
 
+def read_config_file(path: Path) -> dict[str, Any]:
+    """Validated raw contents of one config file ({} when absent/empty)."""
+
+    return _load_and_validate_yaml(path)
+
+
+def load_config(repo_root: Path) -> PlanHubConfig:
+    """Load configuration from built-in defaults and `.plan/config.yaml`.
+
+    Precedence: built-in defaults < repository config.
+    """
+
+    repo_root = repo_root.resolve()
     repo_path = repo_root / ".plan" / "config.yaml"
-    merged = _deep_merge(merged, _load_and_validate_yaml(repo_path))
+    merged = _deep_merge(_default_config_data(), read_config_file(repo_path))
 
     # Convert the validated dict into a typed config object.
     sync_data = merged["sync"]
@@ -156,12 +172,6 @@ def load_config(repo_root: Path) -> PlanHubConfig:
             ),
         )
     )
-
-
-def _global_config_path() -> Path:
-    # Use expanduser so callers/tests can control via HOME.
-    config_home = Path(os.path.expanduser("~")) / ".planhub"
-    return config_home / "config.yaml"
 
 
 def _load_and_validate_yaml(path: Path) -> dict[str, Any]:
@@ -236,6 +246,10 @@ def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any
     """Deep merge dicts where:
     - mappings are merged recursively
     - scalars and lists are replaced
+
+    Note: values copied from `base`/`override` are shared by reference in the
+    result, not deep-copied. Safe as long as callers treat merge results as
+    read-only, since nothing here mutates a merged value after the fact.
     """
 
     result: dict[str, Any] = dict(base)
@@ -246,3 +260,95 @@ def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any
         else:
             result[key] = override_value
     return result
+
+
+def _nested_from_dotted(updates: Mapping[str, Any], *, path: Path) -> dict[str, Any]:
+    """Expand `{"a.b.c": 1}`-style dotted keys into a nested dict.
+
+    Raises ConfigError (not TypeError) when a dotted path tries to descend
+    through a key that another update already set to a scalar, e.g. both
+    "sync.github" and "sync.github.default_labels" in the same call.
+    """
+
+    nested: dict[str, Any] = {}
+    for dotted_key, value in updates.items():
+        parts = dotted_key.split(".")
+        cursor = nested
+        for part in parts[:-1]:
+            existing = cursor.get(part)
+            if existing is None:
+                existing = {}
+                cursor[part] = existing
+            if not isinstance(existing, dict):
+                raise ConfigError(
+                    path, f"Conflicting update for '{dotted_key}': '{part}' is not a mapping."
+                )
+            cursor = existing
+        leaf = parts[-1]
+        if isinstance(cursor.get(leaf), dict):
+            raise ConfigError(
+                path, f"Conflicting update for '{dotted_key}': '{leaf}' is already a mapping."
+            )
+        cursor[leaf] = value
+    return nested
+
+
+def _split_leading_comments(text: str) -> tuple[str, str]:
+    """Split `text` into its leading `#`-comment/blank-line block and the rest."""
+
+    lines = text.splitlines(keepends=True)
+    split_index = 0
+    for line in lines:
+        stripped = line.strip()
+        if stripped == "" or stripped.startswith("#"):
+            split_index += 1
+            continue
+        break
+    return "".join(lines[:split_index]), "".join(lines[split_index:])
+
+
+def write_config_values(path: Path, updates: Mapping[str, Any]) -> bool:
+    """Merge dotted-path `updates` into the YAML config at `path`.
+
+    Reads the file's existing contents (validated), merges the update onto
+    them (never onto built-in defaults, so unrelated keys and the file's own
+    values are preserved), validates the merged result, and writes it back.
+
+    Returns True when the file was written, False when nothing changed (the
+    merged result equals what's already on disk; an absent file is not
+    created just to write nothing new into it).
+
+    Raises ConfigError (naming `path` + the offending dotted path) without
+    writing when the existing file, the update, or the merged result is
+    invalid.
+    """
+
+    existing = _load_and_validate_yaml(path)
+
+    overlay = _nested_from_dotted(updates, path=path)
+    _validate_config_dict(overlay, _CONFIG_SCHEMA, path)
+
+    merged = _deep_merge(existing, overlay)
+    _validate_config_dict(merged, _CONFIG_SCHEMA, path)
+
+    if merged == existing:
+        return False
+
+    header = ""
+    if path.exists():
+        current_text = path.read_text(encoding="utf-8")
+        header, remainder = _split_leading_comments(current_text)
+        if "#" in remainder:
+            print(f"⚠️ Comments in {path} were not preserved by this update.", file=sys.stderr)
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(header + _dump_config_yaml(merged), encoding="utf-8")
+    return True
+
+
+def write_repo_config_values(repo_root: Path, updates: Mapping[str, Any]) -> bool:
+    """Merge-safe write of `updates` into `<repo_root>/.plan/config.yaml`."""
+
+    repo_root = repo_root.resolve()
+    path = repo_root / ".plan" / "config.yaml"
+    return write_config_values(path, updates)

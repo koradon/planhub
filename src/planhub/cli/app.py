@@ -7,7 +7,6 @@ from planhub.cli.commands import (
     issue_command,
     pull_command,
     push_command,
-    setup_command,
     sync_command,
 )
 
@@ -34,17 +33,15 @@ def init_entry(
         "--skills/--no-skills",
         help="Install Claude/Cursor skills for .plan/ authoring. Omitted: you'll be asked.",
     ),
-) -> None:
-    init_command(dry_run=dry_run, skills=skills)
-
-
-@app.command("setup")
-def setup_entry(
-    dry_run: bool = typer.Option(
-        False, "--dry-run", help="Show what would change without writing."
+    yes: bool = typer.Option(
+        False,
+        "--yes",
+        "-y",
+        help="Accept current config values without prompting (also installs skills"
+        " when --skills/--no-skills is omitted).",
     ),
 ) -> None:
-    setup_command(dry_run=dry_run)
+    init_command(dry_run=dry_run, skills=skills, accept_defaults=yes)
 
 
 @app.command("pull")

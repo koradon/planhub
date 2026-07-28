@@ -20,7 +20,6 @@ The roadmap holds future initiatives without committing to exact dates.
 ## Next
 
 - [Init welcome templates](../ideas/20260719-init-welcome-templates.md) (`.plan` issue #2).
-- [Interactive config prompts](../ideas/20260719-interactive-config-prompts.md) (`.plan` issue #26).
 
 ## Later
 
@@ -28,10 +27,12 @@ The roadmap holds future initiatives without committing to exact dates.
 
 ## Shipped (documented)
 
-Core CLI, sync, layered config, archive policies, state reconciliation, the
-`planhub init` agent skills install/update flow, and the `pull`/`push`/`sync`
-command split are documented under `docs/specs/` and `docs/adr/`. See
-[docs/README.md](../README.md).
+Core CLI, sync, archive policies, state reconciliation, the `planhub init`
+agent skills install/update flow, the `pull`/`push`/`sync` command split, and
+[interactive config prompts](../specs/20260728-interactive-config-prompts.md)
+(`.plan` issue #26, which also removed the global config layer — see
+[ADR-0007](../adr/0007-repository-only-configuration.md)) are documented
+under `docs/specs/` and `docs/adr/`. See [docs/README.md](../README.md).
 
 If the project needs more detailed horizon pages, add them under `docs/roadmap/`
 using `docs/llm/templates/roadmap.md`.

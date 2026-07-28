@@ -12,26 +12,6 @@ def test_load_config_uses_defaults(tmp_path) -> None:
     assert cfg.sync.behavior.verbosity == "compact"
 
 
-def test_load_config_global_only(tmp_path) -> None:
-    global_config_dir = tmp_path / ".planhub"
-    global_config_dir.mkdir(parents=True, exist_ok=True)
-    (global_config_dir / "config.yaml").write_text(
-        "\n".join(
-            [
-                "sync:",
-                "  closed_issues:",
-                "    policy: delete",
-                "    archive_dir: custom-archive/issues",
-            ]
-        ),
-        encoding="utf-8",
-    )
-
-    cfg = load_config(tmp_path)
-    assert cfg.sync.closed_issues.policy == "delete"
-    assert cfg.sync.closed_issues.archive_dir == tmp_path / "custom-archive" / "issues"
-
-
 def test_load_config_repository_only(tmp_path) -> None:
     repo_plan_dir = tmp_path / ".plan"
     repo_plan_dir.mkdir(parents=True, exist_ok=True)
@@ -51,54 +31,7 @@ def test_load_config_repository_only(tmp_path) -> None:
     assert cfg.sync.closed_issues.archive_dir == tmp_path / ".plan" / "archive" / "issues"
 
 
-def test_load_config_repo_overrides_global(tmp_path) -> None:
-    global_config_dir = tmp_path / ".planhub"
-    global_config_dir.mkdir(parents=True, exist_ok=True)
-    (global_config_dir / "config.yaml").write_text(
-        "\n".join(
-            [
-                "sync:",
-                "  closed_issues:",
-                "    policy: delete",
-                "    archive_dir: global-archive/issues",
-            ]
-        ),
-        encoding="utf-8",
-    )
-
-    repo_plan_dir = tmp_path / ".plan"
-    repo_plan_dir.mkdir(parents=True, exist_ok=True)
-    (repo_plan_dir / "config.yaml").write_text(
-        "\n".join(
-            [
-                "sync:",
-                "  closed_issues:",
-                "    policy: archive",
-            ]
-        ),
-        encoding="utf-8",
-    )
-
-    cfg = load_config(tmp_path)
-    assert cfg.sync.closed_issues.policy == "archive"
-    # archive_dir came from global because repository config didn't override it.
-    assert cfg.sync.closed_issues.archive_dir == tmp_path / "global-archive" / "issues"
-
-
-def test_load_config_deep_merge_lists_replace(tmp_path) -> None:
-    global_config_dir = tmp_path / ".planhub"
-    global_config_dir.mkdir(parents=True, exist_ok=True)
-    (global_config_dir / "config.yaml").write_text(
-        "\n".join(
-            [
-                "sync:",
-                "  github:",
-                "    default_labels: [a]",
-            ]
-        ),
-        encoding="utf-8",
-    )
-
+def test_load_config_repo_deep_merges_onto_defaults(tmp_path) -> None:
     repo_plan_dir = tmp_path / ".plan"
     repo_plan_dir.mkdir(parents=True, exist_ok=True)
     (repo_plan_dir / "config.yaml").write_text(
@@ -114,12 +47,14 @@ def test_load_config_deep_merge_lists_replace(tmp_path) -> None:
 
     cfg = load_config(tmp_path)
     assert cfg.sync.github.default_labels == ("b",)
+    # Untouched keys still come from built-in defaults.
+    assert cfg.sync.closed_issues.policy == "archive"
 
 
 def test_load_config_unknown_key_fails_with_location(tmp_path) -> None:
-    global_config_dir = tmp_path / ".planhub"
-    global_config_dir.mkdir(parents=True, exist_ok=True)
-    (global_config_dir / "config.yaml").write_text(
+    repo_plan_dir = tmp_path / ".plan"
+    repo_plan_dir.mkdir(parents=True, exist_ok=True)
+    (repo_plan_dir / "config.yaml").write_text(
         "\n".join(
             [
                 "sync:",
@@ -138,9 +73,9 @@ def test_load_config_unknown_key_fails_with_location(tmp_path) -> None:
 
 
 def test_load_config_invalid_policy_fails(tmp_path) -> None:
-    global_config_dir = tmp_path / ".planhub"
-    global_config_dir.mkdir(parents=True, exist_ok=True)
-    (global_config_dir / "config.yaml").write_text(
+    repo_plan_dir = tmp_path / ".plan"
+    repo_plan_dir.mkdir(parents=True, exist_ok=True)
+    (repo_plan_dir / "config.yaml").write_text(
         "\n".join(
             [
                 "sync:",
@@ -158,9 +93,9 @@ def test_load_config_invalid_policy_fails(tmp_path) -> None:
 
 
 def test_load_config_invalid_verbosity_fails(tmp_path) -> None:
-    global_config_dir = tmp_path / ".planhub"
-    global_config_dir.mkdir(parents=True, exist_ok=True)
-    (global_config_dir / "config.yaml").write_text(
+    repo_plan_dir = tmp_path / ".plan"
+    repo_plan_dir.mkdir(parents=True, exist_ok=True)
+    (repo_plan_dir / "config.yaml").write_text(
         "\n".join(
             [
                 "sync:",

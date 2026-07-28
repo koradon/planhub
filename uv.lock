@@ -579,7 +579,7 @@ wheels = [
 
 [[package]]
 name = "planhub"
-version = "0.3.6"
+version = "0.4.0"
 source = { editable = "." }
 dependencies = [
     { name = "pyyaml" },

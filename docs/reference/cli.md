@@ -11,27 +11,35 @@ Command-line interface for Planhub (`planhub`), a Typer app installed as the
 
 ## Entries
 
-### `planhub setup`
-
-Create `~/.planhub/config.yaml` if missing.
-
-| Option | Description |
-| --- | --- |
-| `--dry-run` | Preview the path; do not write |
-
 ### `planhub init`
 
-Create `.plan/issues` and `.plan/milestones`, and ensure global + repo config
-files exist (without overwriting). Also offers to install/update the bundled
-`planhub-plan-artifacts` Claude Code / Cursor skill.
+Create `.plan/issues` and `.plan/milestones`, and ensure the repo config file
+(`.plan/config.yaml`) exists as a minimal stub (without overwriting). Then
+interactively prompts for four sync defaults — `sync.github.default_assignees`,
+`sync.github.default_labels`, `sync.closed_issues.policy`,
+`sync.behavior.verbosity` — showing current values as defaults, and writes
+only the answers that actually differ from what the file already has in
+effect. Also offers to install/update the bundled `planhub-plan-artifacts`
+Claude Code / Cursor skill.
 
 | Option | Description |
 | --- | --- |
-| `--dry-run` | Preview paths; do not write or prompt |
+| `--dry-run` | Preview paths and config questions; do not write or prompt |
+| `--yes` / `-y` | Accept current config values without prompting (also accepts the skills prompt's default when `--skills`/`--no-skills` is omitted) |
 | `--skills` / `--no-skills` | Install/update or skip the skill files; never prompts. Omitted: prompts on a TTY, skips otherwise |
 
-See [plan artifact agent skills](../specs/20260727-plan-artifact-agent-skills.md)
+Config prompts run only on a TTY when `--yes` was not passed; a non-interactive
+shell (CI, redirected stdin) always skips them. A pre-existing
+`.plan/config.yaml` that fails validation does not abort `init` — the prompt
+step is skipped with a warning and the command still exits 0.
+
+See [interactive config prompts](../specs/20260728-interactive-config-prompts.md)
+for the full prompt/write contract, and
+[plan artifact agent skills](../specs/20260727-plan-artifact-agent-skills.md)
 for the install/update decision flow and skill content.
+
+There is no `planhub setup` command and no global config file — see
+[ADR-0007](../adr/0007-repository-only-configuration.md).
 
 ### `planhub pull`
 
@@ -93,5 +101,6 @@ Requires credentials and a GitHub `remote.origin.url`.
 - Spec: [GitHub sync](../specs/20260719-github-sync.md)
 - ADR: [0006 directional pull and push commands](../adr/0006-directional-pull-and-push-commands.md)
 - Spec: [create issue command](../specs/20260719-create-issue-command.md)
-- Spec: [layered configuration](../specs/20260719-layered-configuration.md)
+- Spec: [interactive config prompts](../specs/20260728-interactive-config-prompts.md)
+- ADR: [0007 repository-only configuration](../adr/0007-repository-only-configuration.md)
 - User-facing overview: [README.md](../../README.md)

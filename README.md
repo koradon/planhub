@@ -31,20 +31,27 @@ uv venv
 uv pip install planhub
 ```
 
-## First Run (Required)
-Run `planhub setup` immediately after installation to create the global config
-at `~/.planhub/config.yaml` (created only if missing):
+## First Run
+Run `planhub init` in your repo. It creates the `.plan/` layout, a repo-local
+config file, and interactively prompts for a few common sync defaults:
 
 ```
-planhub setup
+planhub init
 ```
-
-Without this setup step, sync defaults and other CLI behavior may be missing.
 
 ## Commands
 - `planhub init`
-  - Creates the standard `.plan/` structure in the current repo.
-  - Use `--dry-run` to preview the folders that would be created.
+  - Creates the standard `.plan/` structure and `.plan/config.yaml` (if
+    missing) in the current repo.
+  - Use `--dry-run` to preview the folders and config questions without
+    writing anything or reading stdin.
+  - Interactively prompts for default assignees, default labels, closed-issue
+    policy, and sync verbosity, showing current values as defaults. Prompts
+    run only in an interactive shell; a non-interactive shell (CI, redirected
+    stdin) skips them automatically.
+  - Use `--yes`/`-y` to skip the prompts and keep current values (a no-op
+    write on an already-configured repo); it also accepts the skills prompt's
+    default when `--skills`/`--no-skills` is omitted.
   - Offers to install a `planhub-plan-artifacts` skill for Claude Code and
     Cursor (`.claude/skills/` and `.cursor/skills/`) that teaches the agent
     `.plan/` layout, front matter, and to never run `planhub sync` unasked.
@@ -53,9 +60,6 @@ Without this setup step, sync defaults and other CLI behavior may be missing.
     non-interactive runs skip by default).
   - Re-running `planhub init --skills` refreshes any installed skill file
     whose content is out of date with the bundled template.
-- `planhub setup`
-  - Creates the global config file at `~/.planhub/config.yaml` (if missing).
-  - Use `--dry-run` to preview what would be created.
 - `planhub issue <title>`
   - Creates a new GitHub issue with the given title.
   - Requires credentials and a GitHub `remote.origin.url`.
@@ -138,7 +142,9 @@ export GITHUB_TOKEN=ghp_your_token_here
 - `state_reason` requires `state: "closed"`.
 
 ## Config
-- `~/.planhub/config.yaml` and `.plan/config.yaml` are layered (repo overrides global).
+- All config lives in `.plan/config.yaml`, per repository. There is no global
+  config file — `planhub init` prompts interactively for common defaults
+  instead (see First Run above).
 - Set `sync.behavior.verbosity` to `compact` (default) or `verbose`.
 
 ## Development

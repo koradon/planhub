@@ -24,10 +24,12 @@ files) so sync and other commands have a predictable place to read and write.
   optional `issues/`, and optional `assets/`.
 - Closed root issues may live under `.plan/archive/issues/` (see sync/archiving).
 - Closed milestones may live under `.plan/archive/milestones/<slug>/`.
-- `planhub init` creates missing layout directories and ensures global
-  (`~/.planhub/config.yaml`) and repo (`.plan/config.yaml`) config files exist
-  without overwriting existing files.
-- `planhub init --dry-run` prints intended paths and does not write files.
+- `planhub init` creates missing layout directories and ensures the repo
+  config file (`.plan/config.yaml`) exists (as a minimal commented stub)
+  without overwriting an existing file, then runs the interactive config
+  prompts described in [interactive config prompts](20260728-interactive-config-prompts.md).
+- `planhub init --dry-run` prints intended paths and questions and does not
+  write files or read stdin.
 - Sync and other commands that require a layout must fail with a clear hint to
   run `planhub init` when `.plan/` is missing or incomplete.
 
@@ -55,11 +57,11 @@ Imported and CLI-created root issues use `YYYYMMDD-<slug>.md` filenames.
 ### Init command
 
 1. Resolve the current working directory as the repository root.
-2. In dry-run mode, echo the layout and config paths that would be created, then
-   exit successfully.
-3. Otherwise call `ensure_layout`, `ensure_global_config`, and
-   `ensure_repo_config`, and report whether each config was created or already
-   existed.
+2. In dry-run mode, echo the layout and config paths and the config questions
+   that would be asked, then exit successfully without reading stdin.
+3. Otherwise call `ensure_layout` and `ensure_repo_config`, report whether the
+   config was created or already existed, then run the interactive config
+   prompts (see [interactive config prompts](20260728-interactive-config-prompts.md)).
 
 ## Acceptance scenarios (BDD)
 
@@ -68,7 +70,8 @@ See `docs/specs/features/20260719-plan-layout-and-init.feature`.
 ## Related
 
 - Reference: [REPO_LAYOUT.md](../REPO_LAYOUT.md)
-- Spec: [layered configuration](20260719-layered-configuration.md)
+- Spec: [layered configuration](20260719-layered-configuration.md) (superseded)
+- Spec: [interactive config prompts](20260728-interactive-config-prompts.md)
 - Spec: [GitHub sync](20260719-github-sync.md)
 - ADR: [0001 local markdown planning synced to GitHub](../adr/0001-local-markdown-planning-synced-to-github.md)
 - Active plan: (none — shipped)
