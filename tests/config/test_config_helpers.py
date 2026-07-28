@@ -108,6 +108,14 @@ def test_nested_from_dotted_raises_on_prefix_collision(tmp_path) -> None:
         )
 
 
+def test_nested_from_dotted_raises_on_prefix_collision_reverse_order(tmp_path) -> None:
+    with pytest.raises(ConfigError):
+        _nested_from_dotted(
+            {"sync.github.default_labels": ["bug"], "sync.github": "oops"},
+            path=tmp_path / "config.yaml",
+        )
+
+
 def test_split_leading_comments_separates_header_from_body() -> None:
     text = "# a comment\n\nsync:\n  behavior:\n    verbosity: verbose\n"
     header, remainder = _split_leading_comments(text)

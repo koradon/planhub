@@ -284,7 +284,12 @@ def _nested_from_dotted(updates: Mapping[str, Any], *, path: Path) -> dict[str, 
                     path, f"Conflicting update for '{dotted_key}': '{part}' is not a mapping."
                 )
             cursor = existing
-        cursor[parts[-1]] = value
+        leaf = parts[-1]
+        if isinstance(cursor.get(leaf), dict):
+            raise ConfigError(
+                path, f"Conflicting update for '{dotted_key}': '{leaf}' is already a mapping."
+            )
+        cursor[leaf] = value
     return nested
 
 

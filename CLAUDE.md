@@ -75,8 +75,8 @@ imports.
 
 - `layout.py` — `.plan/` directory discovery and structure.
 - `documents.py` — Markdown/YAML front-matter parse and render for issues/milestones.
-- `config.py` — layered config: built-in defaults < `~/.planhub/config.yaml` < `.plan/config.yaml`
-  (ADR-0003). Validates against a schema, rejects unknown keys.
+- `config.py` — repository-only config: built-in defaults merged with `.plan/config.yaml`
+  (ADR-0007, supersedes ADR-0003). Validates against a schema, rejects unknown keys.
 - `github.py` — `GitHubClient`, thin wrapper over the REST API (retries, rate-limit handling,
   pagination via `Link` headers).
 - `repository.py` — resolves `owner/repo` from the local git remote (`remote.origin.url`).
@@ -112,6 +112,6 @@ project's own docs — it's a different concern from the `.plan/` issue/mileston
   (`IssueDocument`, `MilestoneDocument`, `PlanLayout`, `SyncPlan`) rather than passing raw dicts
   around.
 - Tests are function-style (no test classes), live under `tests/`, use `@patch` for mocking.
-- `tests/conftest.py` sets `HOME` to a tmp path for every test (autouse) so no test reads a real
-  `~/.planhub/config.yaml`.
+- `tests/conftest.py` sets `HOME` to a tmp path for every test (autouse) so no test reads or writes
+  real user state (e.g. the `gh` CLI's own config).
 - Update `README.md` when user-facing CLI behavior changes.
