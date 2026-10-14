@@ -142,6 +142,7 @@ def test_init_command_dry_run_lists_skill_paths(mock_echo, tmp_path, monkeypatch
     printed = "\n".join(call.args[0] for call in mock_echo.call_args_list)
     assert str(tmp_path / ".claude" / "skills" / "planhub-plan-artifacts" / "SKILL.md") in printed
     assert str(tmp_path / ".cursor" / "skills" / "planhub-plan-artifacts" / "SKILL.md") in printed
+    assert str(tmp_path / ".codex" / "skills" / "planhub-plan-artifacts" / "SKILL.md") in printed
 
 
 @patch("planhub.cli.commands.init.run_config_prompts")
