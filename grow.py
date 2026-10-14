@@ -75,6 +75,20 @@ def update_version(new_version: str) -> None:
     print(f"✓ Updated version in pyproject.toml to {new_version}")
 
 
+def refresh_lockfile() -> None:
+    """Re-resolve uv.lock so it records the new project version."""
+    try:
+        subprocess.run(["uv", "lock"], check=True)
+    except FileNotFoundError:
+        print("Error: 'uv' not found on PATH; cannot refresh uv.lock")
+        sys.exit(1)
+    except subprocess.CalledProcessError as e:
+        print(f"Error: 'uv lock' failed: {e}")
+        sys.exit(1)
+
+    print("✓ Refreshed uv.lock")
+
+
 def get_last_tag() -> str | None:
     """Get the latest semantic version tag (vX.Y.Z) by version, not history."""
 
@@ -172,8 +186,8 @@ def create_tag_and_commit(new_version: str, changelog: str) -> None:
         print(f"Error: Tag {tag_name} already exists")
         sys.exit(1)
 
-    # Stage pyproject.toml
-    subprocess.run(["git", "add", "pyproject.toml"], check=True)
+    # Stage pyproject.toml and the lockfile that records the same version
+    subprocess.run(["git", "add", "pyproject.toml", "uv.lock"], check=True)
 
     # Create commit
     commit_message = f"Bump version to {new_version}\n\n{changelog}"
@@ -277,6 +291,9 @@ def main() -> None:
 
     # Update version
     update_version(new_version)
+
+    # Keep uv.lock in step with pyproject.toml
+    refresh_lockfile()
 
     # Create commit and tag
     create_tag_and_commit(new_version, changelog)
