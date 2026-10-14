@@ -5,7 +5,9 @@ from importlib import resources
 from pathlib import Path
 
 SKILL_NAMES: tuple[str, ...] = ("planhub-plan-artifacts",)
-_TARGET_DIRS: tuple[str, ...] = (".claude/skills", ".cursor/skills")
+# Codex CLI scans `<repo>/.codex/skills` as a project-local skill root, the same way
+# Claude Code and Cursor scan theirs.
+SKILL_TARGET_DIRS: tuple[str, ...] = (".claude/skills", ".cursor/skills", ".codex/skills")
 
 
 @dataclass(frozen=True)
@@ -16,12 +18,12 @@ class SkillInstallResult:
 
 
 def skill_install_paths(repo_root: Path) -> tuple[Path, ...]:
-    """All .claude/.cursor SKILL.md paths install_skills() would touch."""
+    """All .claude/.cursor/.codex SKILL.md paths install_skills() would touch."""
 
     return tuple(
         repo_root / target_dir / name / "SKILL.md"
         for name in SKILL_NAMES
-        for target_dir in _TARGET_DIRS
+        for target_dir in SKILL_TARGET_DIRS
     )
 
 
@@ -31,7 +33,7 @@ def _skill_content(name: str) -> str:
 
 
 def install_skills(repo_root: Path, *, dry_run: bool = False) -> SkillInstallResult:
-    """Write bundled SKILL.md files into .claude/ and .cursor/.
+    """Write bundled SKILL.md files into .claude/, .cursor/ and .codex/.
 
     Creates missing files, overwrites files whose content differs from the
     current bundled template, and leaves already-up-to-date files untouched.
@@ -42,7 +44,7 @@ def install_skills(repo_root: Path, *, dry_run: bool = False) -> SkillInstallRes
     unchanged: list[Path] = []
     for name in SKILL_NAMES:
         content = _skill_content(name)
-        for target_dir in _TARGET_DIRS:
+        for target_dir in SKILL_TARGET_DIRS:
             path = repo_root / target_dir / name / "SKILL.md"
             if path.exists():
                 if path.read_text(encoding="utf-8") == content:

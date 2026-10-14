@@ -28,7 +28,7 @@ def init_command(
         typer.echo("🧪 [dry-run] Would ask:")
         for line in describe_prompts_dry_run(target_path=plan_root / "config.yaml"):
             typer.echo(line)
-        typer.echo("🧪 [dry-run] Would offer to install Claude/Cursor skills:")
+        typer.echo("🧪 [dry-run] Would offer to install Claude/Cursor/Codex skills:")
         for path in skill_install_paths(repo_root):
             typer.echo(f"- {path}")
         return
@@ -67,7 +67,7 @@ def init_command(
             install = True
         else:
             install = sys.stdin.isatty() and typer.confirm(
-                "Install Claude/Cursor skills for authoring .plan/ issues and milestones?",
+                "Install Claude/Cursor/Codex skills for authoring .plan/ issues and milestones?",
                 default=True,
             )
     if install:
@@ -80,5 +80,5 @@ def init_command(
             typer.echo(f"🧩 Skill already up to date: {path}")
     else:
         typer.echo(
-            "🧩 Skipped Claude/Cursor skills (run `planhub init --skills` later to add them)."
+            "🧩 Skipped Claude/Cursor/Codex skills (run `planhub init --skills` later to add them)."
         )

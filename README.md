@@ -52,8 +52,9 @@ planhub init
   - Use `--yes`/`-y` to skip the prompts and keep current values (a no-op
     write on an already-configured repo); it also accepts the skills prompt's
     default when `--skills`/`--no-skills` is omitted.
-  - Offers to install a `planhub-plan-artifacts` skill for Claude Code and
-    Cursor (`.claude/skills/` and `.cursor/skills/`) that teaches the agent
+  - Offers to install a `planhub-plan-artifacts` skill for Claude Code,
+    Cursor and Codex (`.claude/skills/`, `.cursor/skills/` and
+    `.codex/skills/`) that teaches the agent
     `.plan/` layout, front matter, and to never run `planhub sync` unasked.
   - Use `--skills` to install/update without prompting, or `--no-skills` to
     skip without prompting. Omit both to be asked (interactive shells only —
