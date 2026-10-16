@@ -1,19 +1,19 @@
 Feature: Plan artifact agent skills
-  Install a Claude/Cursor skill during `planhub init` that teaches agents the .plan/ format.
+  Install a Claude/Cursor/Codex/Antigravity skill during `planhub init` that teaches agents the .plan/ format.
 
   # Related spec: docs/specs/20260727-plan-artifact-agent-skills.md
 
   Scenario: Dry-run lists skill paths without writing or prompting
     Given a repository without `.plan/` yet
     When the user runs `planhub init --dry-run`
-    Then the output lists the `.claude/skills/planhub-plan-artifacts/SKILL.md` and `.cursor/skills/planhub-plan-artifacts/SKILL.md` paths
+    Then the output lists the `.claude/skills/planhub-plan-artifacts/SKILL.md`, `.cursor/skills/planhub-plan-artifacts/SKILL.md`, `.codex/skills/planhub-plan-artifacts/SKILL.md` and `.agents/skills/planhub-plan-artifacts/SKILL.md` paths
     And no files are written
     And the user is not prompted
 
   Scenario: Explicit --skills installs without prompting
     Given a repository with no skill files installed
     When the user runs `planhub init --skills`
-    Then `.claude/skills/planhub-plan-artifacts/SKILL.md` and `.cursor/skills/planhub-plan-artifacts/SKILL.md` are created
+    Then `.claude/skills/planhub-plan-artifacts/SKILL.md`, `.cursor/skills/planhub-plan-artifacts/SKILL.md`, `.codex/skills/planhub-plan-artifacts/SKILL.md` and `.agents/skills/planhub-plan-artifacts/SKILL.md` are created
     And the user is not prompted
 
   Scenario: Explicit --no-skills skips without touching existing files

@@ -6,14 +6,19 @@ accepted
 
 ## Summary
 
-`planhub init` can install a bundled Claude Code / Cursor skill that teaches
-AI agents how to author valid `.plan/` issues and milestones, and when (and
-when not) to run `planhub sync`. Installation and updates happen only through
-`init`, and only with the user's consent.
+`planhub init` can install a bundled Claude Code / Cursor / Codex / Antigravity
+skill that teaches AI agents how to author valid `.plan/` issues and
+milestones, and when (and when not) to run `planhub sync`. Installation and
+updates happen only through `init`, and only with the user's consent.
+
+Target directories: `.claude/skills/`, `.cursor/skills/`, `.codex/skills/`
+(Codex CLI) and `.agents/skills/` (Antigravity CLI, `agy`) — one bundled
+template written identically into each repo-local root the supported agent
+harnesses scan for project skills.
 
 ## User stories
 
-- As a developer, I want Claude Code / Cursor to already know Planhub's issue
+- As a developer, I want Claude Code / Cursor / Codex / Antigravity to already know Planhub's issue
   and milestone front matter when I ask it to draft a plan, so that I don't
   have to paste format docs into the prompt myself.
 - As a developer, I want to opt in or out of installing these skills during
@@ -36,12 +41,14 @@ when not) to run `planhub sync`. Installation and updates happen only through
 - `planhub init` gains a tri-state `--skills`/`--no-skills` option:
   - `--skills` — install/update the skill files; never prompts.
   - `--no-skills` — skip entirely; never prompts.
-  - omitted — if stdin is a TTY, prompt `Install Claude/Cursor skills for
-    authoring .plan/ issues and milestones?` (default yes); if stdin is not a
+  - omitted — if stdin is a TTY, prompt `Install Claude/Cursor/Codex/Antigravity
+    skills for authoring .plan/ issues and milestones?` (default yes); if stdin is not a
     TTY, skip without prompting.
 - Skill files are written identically to
-  `.claude/skills/planhub-plan-artifacts/SKILL.md` and
-  `.cursor/skills/planhub-plan-artifacts/SKILL.md`.
+  `.claude/skills/planhub-plan-artifacts/SKILL.md`,
+  `.cursor/skills/planhub-plan-artifacts/SKILL.md`,
+  `.codex/skills/planhub-plan-artifacts/SKILL.md`, and
+  `.agents/skills/planhub-plan-artifacts/SKILL.md`.
 - Installing (via `--skills` or a confirmed prompt) creates missing files and
   overwrites existing files whose content differs from the current bundled
   template, so re-running `init` refreshes skills to the version bundled with
@@ -60,8 +67,8 @@ when not) to run `planhub sync`. Installation and updates happen only through
 ### Decision flow
 
 1. `--dry-run`: print the layout/config paths (existing behavior) plus the
-   `.claude`/`.cursor` skill paths `install_skills` would touch; exit before
-   writing anything or prompting.
+   `.claude`/`.cursor`/`.codex`/`.agents` skill paths `install_skills` would
+   touch; exit before writing anything or prompting.
 2. Otherwise, run the existing layout/config setup, then resolve the skills
    decision:
    - `--skills` passed → proceed to install/update.

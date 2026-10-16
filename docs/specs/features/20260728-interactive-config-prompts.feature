@@ -58,4 +58,4 @@ Feature: Interactive config prompts for init
   Scenario: --yes also accepts the default for the omitted skills flag
     Given neither `--skills` nor `--no-skills` was passed
     When the user runs `planhub init --yes`
-    Then the Claude/Cursor skill files are installed without a confirmation prompt
+    Then the Claude/Cursor/Codex/Antigravity skill files are installed without a confirmation prompt

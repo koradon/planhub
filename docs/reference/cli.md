@@ -20,7 +20,7 @@ interactively prompts for four sync defaults — `sync.github.default_assignees`
 `sync.behavior.verbosity` — showing current values as defaults, and writes
 only the answers that actually differ from what the file already has in
 effect. Also offers to install/update the bundled `planhub-plan-artifacts`
-Claude Code / Cursor skill.
+Claude Code / Cursor / Codex / Antigravity skill.
 
 | Option | Description |
 | --- | --- |
