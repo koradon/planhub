@@ -5,9 +5,15 @@ from importlib import resources
 from pathlib import Path
 
 SKILL_NAMES: tuple[str, ...] = ("planhub-plan-artifacts",)
-# Codex CLI scans `<repo>/.codex/skills` as a project-local skill root, the same way
-# Claude Code and Cursor scan theirs.
-SKILL_TARGET_DIRS: tuple[str, ...] = (".claude/skills", ".cursor/skills", ".codex/skills")
+# Codex CLI scans `<repo>/.codex/skills` and Antigravity CLI (`agy`) scans
+# `<repo>/.agents/skills` as project-local skill roots, the same way Claude
+# Code and Cursor scan theirs.
+SKILL_TARGET_DIRS: tuple[str, ...] = (
+    ".claude/skills",
+    ".cursor/skills",
+    ".codex/skills",
+    ".agents/skills",
+)
 
 
 @dataclass(frozen=True)
@@ -18,7 +24,7 @@ class SkillInstallResult:
 
 
 def skill_install_paths(repo_root: Path) -> tuple[Path, ...]:
-    """All .claude/.cursor/.codex SKILL.md paths install_skills() would touch."""
+    """All .claude/.cursor/.codex/.agents SKILL.md paths install_skills() would touch."""
 
     return tuple(
         repo_root / target_dir / name / "SKILL.md"
@@ -33,7 +39,7 @@ def _skill_content(name: str) -> str:
 
 
 def install_skills(repo_root: Path, *, dry_run: bool = False) -> SkillInstallResult:
-    """Write bundled SKILL.md files into .claude/, .cursor/ and .codex/.
+    """Write bundled SKILL.md files into .claude/, .cursor/, .codex/ and .agents/.
 
     Creates missing files, overwrites files whose content differs from the
     current bundled template, and leaves already-up-to-date files untouched.

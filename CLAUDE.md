@@ -92,9 +92,9 @@ imports.
   (`archive_closed_issues_in_filesystem`) and milestone archive-location reconciliation.
 - `cli/app.py` + `cli/commands/**` — Typer command wiring; each command module stays thin and
   delegates to the modules above.
-- `skills/` — bundled Claude/Cursor/Codex skill template (`planhub-plan-artifacts`) installed by
-  `planhub init --skills` into a target repo's `.claude/skills/`, `.cursor/skills/` and
-  `.codex/skills/`.
+- `skills/` — bundled Claude/Cursor/Codex/Antigravity skill template (`planhub-plan-artifacts`)
+  installed by `planhub init --skills` into a target repo's `.claude/skills/`, `.cursor/skills/`,
+  `.codex/skills/` and `.agents/skills/`.
 
 ### Credentials
 

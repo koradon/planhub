@@ -31,7 +31,10 @@ def init_entry(
     skills: bool | None = typer.Option(
         None,
         "--skills/--no-skills",
-        help="Install Claude/Cursor/Codex skills for .plan/ authoring. Omitted: you'll be asked.",
+        help=(
+            "Install Claude/Cursor/Codex/Antigravity skills for .plan/ authoring."
+            " Omitted: you'll be asked."
+        ),
     ),
     yes: bool = typer.Option(
         False,
