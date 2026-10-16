@@ -18,7 +18,7 @@ harnesses scan for project skills.
 
 ## User stories
 
-- As a developer, I want Claude Code / Cursor to already know Planhub's issue
+- As a developer, I want Claude Code / Cursor / Codex / Antigravity to already know Planhub's issue
   and milestone front matter when I ask it to draft a plan, so that I don't
   have to paste format docs into the prompt myself.
 - As a developer, I want to opt in or out of installing these skills during
@@ -41,8 +41,8 @@ harnesses scan for project skills.
 - `planhub init` gains a tri-state `--skills`/`--no-skills` option:
   - `--skills` — install/update the skill files; never prompts.
   - `--no-skills` — skip entirely; never prompts.
-  - omitted — if stdin is a TTY, prompt `Install Claude/Cursor skills for
-    authoring .plan/ issues and milestones?` (default yes); if stdin is not a
+  - omitted — if stdin is a TTY, prompt `Install Claude/Cursor/Codex/Antigravity
+    skills for authoring .plan/ issues and milestones?` (default yes); if stdin is not a
     TTY, skip without prompting.
 - Skill files are written identically to
   `.claude/skills/planhub-plan-artifacts/SKILL.md`,
